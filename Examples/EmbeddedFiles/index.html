@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Embedded Web Files</title>
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+    <main class="card">
+        <p class="eyebrow">GFX.WebView</p>
+        <h1>Web files, embedded in the application</h1>
+        <p class="introduction">
+            This interface keeps its HTML, CSS, and JavaScript in separate files
+            while Silex packages them into the executable.
+        </p>
+
+        <form id="greeting-form">
+            <label for="name">What is your name?</label>
+            <div class="controls">
+                <input id="name" name="name" value="Silex developer" autocomplete="name">
+                <button type="submit">Greet me</button>
+            </div>
+        </form>
+
+        <p id="status" class="status" aria-live="polite">The JavaScript bridge is ready.</p>
+    </main>
+
+    <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+use GFX.Plugins
+use GFX.Resources
+use GFX.WebView
+
+func injected_web_view(view:&Resources.WebView) {}
+
+test "consume GFX.WebView through public package boundaries" {
+    let site = WebView.Site.html("<!doctype html><html></html>")
+    let settings = Plugins.WebViewSettings(context_menu:true)
+    let plugin = Plugins.WebView(site, settings)
+    assert(plugin.id() == "GFX.WebView.Plugin")
+}

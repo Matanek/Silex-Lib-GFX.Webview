@@ -1,0 +1,56 @@
+use GFX.Application
+use GFX.Application.Schedule
+use GFX.WebView.Plugin as WebViewPlugin
+use GFX.Window.Plugin as WindowPlugin
+use GFX.Window
+use GFX.WebView
+
+func inspect_web_view(view:@WebView.View) {
+    assert(view.is_visible())
+}
+
+func run_lifecycle(application:Application) int {
+    application.run_schedule(Schedule.startup)
+    application.run_schedule(Schedule.update)
+    application.run_schedule(Schedule.shutdown)
+    return 0
+}
+
+test "destroy an application WebView before its window" {
+    if !WebView.availability().is_available() { return }
+
+    let site = WebView.Site.html(
+        "<!doctype html><html><body>WebView lifecycle</body></html>"
+    )
+    var application = Application()
+    application.add_plugin(WindowPlugin(WindowPlugin.Settings()
+        ..title = "WebView application lifecycle"
+        ..hidden = true
+    ))
+    application.add_plugin(WebViewPlugin(site))
+    assert(application.has_plugin("GFX.Window.Plugin"))
+    application.add_system(Schedule.update, inspect_web_view)
+    application.with_runner(run_lifecycle)
+    application.run()
+    assert(application.has_plugin("GFX.Input.Plugin"))
+}
+
+func request_close(view:@WebView.View) {
+    view.simulate_close_request()
+}
+
+test "close an application WebView through its window controls" {
+    if !WebView.availability().is_available() { return }
+
+    let site = WebView.Site.html(
+        "<!doctype html><html><body>Closable WebView</body></html>"
+    )
+    Application()
+        ..add_plugin(WindowPlugin(WindowPlugin.Settings()
+            ..title = "Closable WebView"
+            ..hidden = true
+        ))
+        ..add_plugin(WebViewPlugin(site))
+        ..add_system(Schedule.startup, request_close)
+        ..run()
+}

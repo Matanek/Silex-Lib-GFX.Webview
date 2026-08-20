@@ -1,0 +1,66 @@
+use GFX.Application.Plugin as PluginProtocol
+use GFX.Application
+use GFX.Application.Schedule
+use GFX.Window.Plugin as WindowPlugin
+use GFX.WebView.Site
+use GFX.WebView.Settings
+use GFX.WebView.View
+use GFX.Window
+
+struct Configuration {
+    let site:Site
+    let settings:Settings
+}
+
+public struct Plugin:PluginProtocol {
+    private let site:Site?
+    private let settings:Settings
+
+    init(site:Site, settings:Settings = Settings()) {
+        self.site = site
+        self.settings = settings
+    }
+
+    func id() str { return "GFX.WebView.Plugin" }
+
+    func build(application:&Application) {
+        application.add_plugin(WindowPlugin())
+        if let site = self.site {
+            application.add_resource(Configuration(
+                site:site,
+                settings:self.settings
+            ))
+        } else {
+            panic("GFX.WebView.Plugin requires a site")
+        }
+        application.add_system(Schedule.startup, start_web_view)
+        application.add_system(Schedule.post_update, flush_web_messages)
+        application.add_system(Schedule.shutdown, stop_web_view)
+    }
+}
+
+func start_web_view(application:Application) {
+    var resources = application.resources()
+    let stored_configuration = resources.remove<Configuration>()
+    if let configuration = stored_configuration {
+        var stored_window = resources.remove<Window>()
+        if var window = stored_window {
+            var view = View(window, configuration.site, configuration.settings)
+            resources.insert(window)
+            resources.insert(view)
+            return
+        }
+        panic("GFX.WebView.Plugin requires a window")
+    }
+    panic("GFX.WebView.Plugin has no site")
+}
+
+func flush_web_messages(view:&View) {
+    view.flush()
+}
+
+func stop_web_view(application:Application) {
+    var resources = application.resources()
+    var removed = resources.remove<View>()
+    assert(removed != null)
+}

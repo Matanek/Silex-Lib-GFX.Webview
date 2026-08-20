@@ -1,0 +1,45 @@
+use GFX.Application
+use GFX.Plugins
+use GFX.Resources
+use GFX.WebView
+
+func handle_web_messages(view:&Resources.WebView) {
+    for message in view.receive() {
+        if message.name == "action" {
+            view.send("status", "Connected to Silex: " + message.payload)
+        }
+    }
+}
+
+func main() {
+    let site = WebView.Site.html(
+        "<!doctype html>" +
+        "<html lang=\"en\">" +
+        "<head>" +
+        "<meta charset=\"utf-8\">" +
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+        "<title>Basic WebView</title>" +
+        "</head>" +
+        "<body>" +
+        "<button id=\"action\">Send a message to Silex</button>" +
+        "<p id=\"status\">Loading the JavaScript bridge...</p>" +
+        "<script>" +
+        "const action = document.querySelector('#action');" +
+        "const status = document.querySelector('#status');" +
+        "action.addEventListener('click', () => {" +
+        "status.textContent = 'Message sent; waiting for Silex...';" +
+        "window.silex.send('action', 'button clicked');" +
+        "});" +
+        "window.silex.on('status', payload => {" +
+        "status.textContent = payload;" +
+        "});" +
+        "status.textContent = 'Inline JavaScript bridge ready';" +
+        "</script>" +
+        "</body>" +
+        "</html>"
+    )
+    Application()
+        ..add_plugin(Plugins.WebView(site))
+        ..add_system(Application.Schedule.update, handle_web_messages)
+        ..run()
+}

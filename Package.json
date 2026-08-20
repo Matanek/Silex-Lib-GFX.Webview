@@ -1,0 +1,20 @@
+{
+  "name": "GFX.WebView",
+  "version": "0.1.0",
+  "requires": { "silex": ">=0.38.34" },
+  "dependencies": {
+    "GFX": "^0.36.0",
+    "JSON": "^0.1.0",
+    "STD": "^0.16.0"
+  },
+  "boundary": {
+    "macos-arm64": {
+      "providers": {
+        "System": {
+          "frameworks": ["Cocoa", "WebKit"],
+          "libraries": ["objc"]
+        }
+      }
+    }
+  }
+}

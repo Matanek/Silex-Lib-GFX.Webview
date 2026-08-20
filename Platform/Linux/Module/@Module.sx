@@ -1,0 +1,65 @@
+// Temporary target-complete adapter. It remains unavailable until WebView can
+// host a WPE WebKit surface inside the GFX window without a second toolkit
+// window or a per-frame GTK pump.
+func available() bool { return false }
+
+func unavailable_reason() str {
+    return "the Linux adapter requires an embeddable system WebKit surface; " +
+        "GTK 4 cannot attach WebKitGTK to the foreign GFX window, and the WPE backend is not implemented yet"
+}
+
+func create(
+    window:uint,
+    document:str,
+    initialization_script:str,
+    bridge_context:uint,
+    bridge_callback:uint
+) uint {
+    unavailable()
+    return 0 as uint
+}
+
+func bridge_script() str { return "window.__silexPost=message=>{};" }
+
+func send(view:uint, encoded_batch:str) bool { return false }
+
+func message_context(handler:uint) uint { return 0 as uint }
+func message_text(message:uint) str { return "" }
+
+func load(view:uint, document:str) bool {
+    unavailable()
+    return false
+}
+
+func set_visible(view:uint, visible:bool) {
+    unavailable()
+}
+
+func is_visible(view:uint) bool {
+    unavailable()
+    return false
+}
+
+func loading(view:uint) bool {
+    unavailable()
+    return false
+}
+
+func set_background(window:uint, view:uint, red:float, green:float, blue:float, alpha:float) {
+    unavailable()
+}
+
+func simulate_close_request(window:uint) {
+    unavailable()
+}
+
+func destroy(view:uint) {
+    if view != 0 as uint { unavailable() }
+}
+
+func unavailable() {
+    panic(
+        "GFX.WebView on Linux needs a WPE WebKit surface that can share the GFX window; " +
+        "opening a separate GTK window would violate the View contract"
+    )
+}

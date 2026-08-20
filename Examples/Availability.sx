@@ -1,0 +1,7 @@
+use GFX.WebView
+
+func main() {
+    let status = WebView.availability()
+    if status.is_available() { return }
+    if let reason = status.reason() { assert(reason != "") }
+}

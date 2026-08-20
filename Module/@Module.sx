@@ -1,0 +1,546 @@
+use GFX.Window
+use GFX.Color
+use JSON
+use STD.Text.UTF8.bytes as utf8_bytes
+use Interop.C
+
+public enum MediaType {
+    html
+    css
+    javascript
+    plain_text
+    json
+    svg
+    png
+    jpeg
+    webp
+    gif
+    avif
+    bmp
+    icon
+    woff
+    woff2
+    truetype
+    opentype
+    wasm
+    pdf
+    binary
+    custom(str)
+}
+
+public func media_type_text(media_type:MediaType) str {
+    return match media_type {
+        html => "text/html; charset=utf-8"
+        css => "text/css; charset=utf-8"
+        javascript => "text/javascript; charset=utf-8"
+        plain_text => "text/plain; charset=utf-8"
+        json => "application/json"
+        svg => "image/svg+xml"
+        png => "image/png"
+        jpeg => "image/jpeg"
+        webp => "image/webp"
+        gif => "image/gif"
+        avif => "image/avif"
+        bmp => "image/bmp"
+        icon => "image/vnd.microsoft.icon"
+        woff => "font/woff"
+        woff2 => "font/woff2"
+        truetype => "font/ttf"
+        opentype => "font/otf"
+        wasm => "application/wasm"
+        pdf => "application/pdf"
+        binary => "application/octet-stream"
+        custom(value) => value
+    }
+}
+
+enum AssetContent {
+    empty
+    text(str)
+    bytes(uint8[])
+}
+
+public struct Asset {
+    private let logical_path:str
+    private let media_type_value:MediaType
+    private let embedded_content:AssetContent
+
+    init(content:str, path:str, media_type:MediaType) {
+        self.logical_path = path
+        self.media_type_value = media_type
+        self.embedded_content = AssetContent.text(content)
+    }
+
+    init(content:uint8[], path:str, media_type:MediaType) {
+        self.logical_path = path
+        self.media_type_value = media_type
+        self.embedded_content = AssetContent.bytes(content)
+    }
+
+    static func html(text:str, path:str = "/index.html") Asset {
+        return Asset(content:text, path:path, media_type:MediaType.html)
+    }
+
+    static func css(text:str, path:str = "/style.css") Asset {
+        return Asset(content:text, path:path, media_type:MediaType.css)
+    }
+
+    static func javascript(text:str, path:str = "/app.js") Asset {
+        return Asset(content:text, path:path, media_type:MediaType.javascript)
+    }
+
+    func path() str { return self.logical_path }
+    func media_type() MediaType { return self.media_type_value }
+    func media_type_text() str { return media_type_text(self.media_type_value) }
+
+    func text() str {
+        return match self.embedded_content {
+            empty => missing_asset_text()
+            text(value) => value
+            bytes(_) => missing_asset_text()
+        }
+    }
+
+    module func is_text() bool {
+        return match self.embedded_content {
+            empty => false
+            text(_) => true
+            bytes(_) => false
+        }
+    }
+
+    module func data() uint8[] {
+        return match self.embedded_content {
+            empty => empty_asset_data()
+            text(value) => utf8_bytes(value)
+            bytes(value) => value
+        }
+    }
+}
+
+func missing_asset_text() str {
+    panic("GFX.WebView.Asset contains bytes, not text")
+}
+
+func empty_asset_data() uint8[] {
+    let result:uint8[] = []
+    return result
+}
+
+public struct Site {
+    private var entry_path:str
+    private var embedded_assets:Asset[]
+
+    private init(entry:Asset) {
+        self.entry_path = entry.path()
+        self.embedded_assets = [entry]
+    }
+
+    static func html(text:str) Site {
+        return Site(Asset.html(text))
+    }
+
+    func add(asset:Asset) {
+        for let existing in self.embedded_assets {
+            if existing.path() == asset.path() {
+                panic("GFX.WebView.Site cannot contain two assets with the same path")
+            }
+        }
+        self.embedded_assets.append(asset)
+    }
+
+    func entry() Asset {
+        return self.require(self.entry_path)
+    }
+
+    func find(path:str) Asset? {
+        for let asset in self.embedded_assets {
+            if asset.path() == path { return asset }
+        }
+        return null
+    }
+
+    func require(path:str) Asset {
+        if let asset = self.find(path) { return asset }
+        panic("GFX.WebView.Site does not contain the requested asset")
+    }
+
+    func assets() @self:Asset[..] {
+        return @self.embedded_assets[0:self.embedded_assets.count()]
+    }
+
+    func count() int { return self.embedded_assets.count() }
+}
+
+public enum Status {
+    loading
+    ready
+}
+
+public struct Settings {
+    var background:Color = Color(r:0.0, g:0.0, b:0.0, a:0.0)
+    var context_menu:bool = false
+}
+
+public struct Availability {
+    private let available_value:bool
+    private let reason_value:str
+
+    module static func available() Availability {
+        return Availability(available_value:true, reason_value:"")
+    }
+
+    module static func unavailable(reason:str) Availability {
+        return Availability(available_value:false, reason_value:reason)
+    }
+
+    func is_available() bool { return self.available_value }
+
+    func reason() str? {
+        if self.available_value { return null }
+        return self.reason_value
+    }
+}
+
+public struct Message {
+    let name:str
+    let payload:str
+}
+
+class Bridge {
+    private var incoming:Message[]
+    private var outgoing:Message[]
+    private var received_batches:int
+    private var sent_batches:int
+
+    init() {
+        self.incoming = []
+        self.outgoing = []
+        self.received_batches = 0
+        self.sent_batches = 0
+    }
+
+    func record(encoded_batch:str) {
+        match JSON.try_parse(encoded_batch) {
+            failure(error) => {}
+            success(var batch) => {
+                if var entries = batch.as_array() {
+                    self.received_batches++
+                    for var entry in entries {
+                        if var pair = entry.as_array() {
+                            if pair.count() == 2 {
+                                if let name = pair[0].as_string() {
+                                    if let payload = pair[1].as_string() {
+                                        var incoming = self.incoming
+                                        incoming.append(Message(name:name, payload:payload))
+                                        self.incoming = incoming
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func queue(message:Message) {
+        var outgoing = self.outgoing
+        outgoing.append(message)
+        self.outgoing = outgoing
+    }
+
+    func take_incoming() Message[] {
+        let result = self.incoming
+        self.incoming = []
+        return result
+    }
+
+    func take_outgoing() Message[] {
+        let result = self.outgoing
+        self.outgoing = []
+        return result
+    }
+
+    func restore_outgoing(messages:Message[]) { self.outgoing = messages }
+    func mark_sent() { self.sent_batches++ }
+
+    func received_batch_count() int { return self.received_batches }
+    func sent_batch_count() int { return self.sent_batches }
+}
+
+func receive_bridge_message(handler:uint, command:uint, controller:uint, message:uint) {
+    let context = Platform.message_context(handler)
+    if context == 0 as uint { return }
+    let text = Platform.message_text(message)
+    if text == "" { return }
+    var bridge = C.object_from_address<Bridge>(context)
+    bridge.record(text)
+}
+
+public func availability() Availability {
+    if Platform.available() { return Availability.available() }
+    return Availability.unavailable(Platform.unavailable_reason())
+}
+
+public class View {
+    private var window:Window?
+    private var bridge:Bridge
+    private let platform_window:uint
+    private let handle:uint
+    private let document_value:str
+
+    init(window:@Window, site:Site, settings:Settings = Settings()) {
+        let availability = availability()
+        if !availability.is_available() {
+            if let reason = availability.reason() { panic("GFX.WebView is unavailable: " + reason) }
+            panic("GFX.WebView is unavailable on this platform")
+        }
+        let platform_window = window.presentation_handle()
+        if platform_window == 0 as uint {
+            panic("GFX.WebView could not access the system window")
+        }
+        var bridge = Bridge()
+        let callback:func(uint, uint, uint, uint) void = receive_bridge_message
+        let document_value = document(site, settings)
+        let handle = Platform.create(
+            platform_window,
+            document_value,
+            Platform.bridge_script() + bridge_script(),
+            C.object_address(bridge),
+            C.function_address(callback)
+        )
+        if handle == 0 as uint {
+            panic("GFX.WebView could not create the system WebView")
+        }
+        self.window = window
+        self.bridge = bridge
+        self.platform_window = platform_window
+        self.handle = handle
+        self.document_value = document_value
+        self.set_background(settings.background)
+    }
+
+    drop {
+        Platform.destroy(self.handle)
+    }
+
+    func reload() {
+        if !Platform.load(self.handle, self.document_value) {
+            panic("GFX.WebView could not reload its embedded document")
+        }
+    }
+
+    func set_visible(visible:bool) {
+        Platform.set_visible(self.handle, visible)
+    }
+
+    func is_visible() bool {
+        return Platform.is_visible(self.handle)
+    }
+
+    func set_background(color:Color) {
+        Platform.set_background(
+            self.platform_window,
+            self.handle,
+            color.r,
+            color.g,
+            color.b,
+            color.a
+        )
+    }
+
+    func status() Status {
+        if Platform.loading(self.handle) { return Status.loading }
+        return Status.ready
+    }
+
+    func send(name:str, payload:str = "") {
+        self.bridge.queue(Message(name:name, payload:payload))
+    }
+
+    func flush() bool {
+        if self.status() == Status.loading { return false }
+        let messages = self.bridge.take_outgoing()
+        if messages.count() == 0 { return false }
+        if Platform.send(self.handle, encode_messages(messages)) {
+            self.bridge.mark_sent()
+            return true
+        }
+        self.bridge.restore_outgoing(messages)
+        return false
+    }
+
+    func receive() Message[] { return self.bridge.take_incoming() }
+
+    module func received_batch_count() int { return self.bridge.received_batch_count() }
+    module func sent_batch_count() int { return self.bridge.sent_batch_count() }
+
+    package func simulate_close_request() {
+        Platform.simulate_close_request(self.platform_window)
+    }
+}
+
+func document(site:Site, settings:Settings = Settings()) str {
+    var result = site.entry().text() +
+        "\n<script>" + context_menu_script(settings) + "</script>\n"
+    for let asset in site.assets() {
+        if asset.path() != site.entry().path() {
+            let media_type = asset.media_type()
+            if asset.is_text() && is_css(media_type) {
+                result = result + "\n<style>\n" + asset.text() + "\n</style>\n"
+            }
+            if asset.is_text() && is_javascript(media_type) {
+                result = result + "\n<script>\n" + asset.text() + "\n</script>\n"
+            }
+        }
+    }
+    for let asset in site.assets() {
+        if asset.path() != site.entry().path() &&
+            (!asset.is_text() || (!is_css(asset.media_type()) && !is_javascript(asset.media_type()))) {
+            result = replace_all(result, asset.path(), data_uri(asset))
+        }
+    }
+    return result
+}
+
+func data_uri(asset:Asset) str {
+    return "data:" + asset.media_type_text() + ";base64," + base64(asset.data())
+}
+
+func base64(values:uint8[]) str {
+    let alphabet = utf8_bytes("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+    var output:uint8[] = []
+    var index = 0
+    while index < values.count() {
+        let first = values[index] as uint32
+        var second:uint32 = 0
+        var third:uint32 = 0
+        if index + 1 < values.count() { second = values[index + 1] as uint32 }
+        if index + 2 < values.count() { third = values[index + 2] as uint32 }
+        let value = (first << 16) + (second << 8) + third
+        output.append(alphabet[((value >> 18) & 63) as int])
+        output.append(alphabet[((value >> 12) & 63) as int])
+        if index + 1 < values.count() {
+            output.append(alphabet[((value >> 6) & 63) as int])
+        } else {
+            output.append(61 as uint8)
+        }
+        if index + 2 < values.count() {
+            output.append(alphabet[(value & 63) as int])
+        } else {
+            output.append(61 as uint8)
+        }
+        index += 3
+    }
+    return C.string(@output[0:output.count()])
+}
+
+func replace_all(text:str, pattern:str, replacement:str) str {
+    let input = utf8_bytes(text)
+    let searched = utf8_bytes(pattern)
+    if searched.count() == 0 { return text }
+    let inserted = utf8_bytes(replacement)
+    var output:uint8[] = []
+    var index = 0
+    while index < input.count() {
+        var matches = index + searched.count() <= input.count()
+        var offset = 0
+        while matches && offset < searched.count() {
+            if input[index + offset] != searched[offset] { matches = false }
+            offset++
+        }
+        if matches {
+            for byte in inserted { output.append(byte) }
+            index += searched.count()
+        } else {
+            output.append(input[index])
+            index++
+        }
+    }
+    return C.string(@output[0:output.count()])
+}
+
+func is_css(media_type:MediaType) bool {
+    return match media_type {
+        css => true
+        custom(value) => value == "text/css" || value == "text/css; charset=utf-8"
+        else => false
+    }
+}
+
+func is_javascript(media_type:MediaType) bool {
+    return match media_type {
+        javascript => true
+        custom(value) => value == "text/javascript" || value == "text/javascript; charset=utf-8"
+        else => false
+    }
+}
+
+func context_menu_script(settings:Settings) str {
+    if settings.context_menu { return "" }
+    return "document.addEventListener('contextmenu',event=>event.preventDefault(),{capture:true});"
+}
+
+func encode_messages(messages:Message[]) str {
+    var output:uint8[] = []
+    output.append(91 as uint8)
+    var index = 0
+    for message in messages {
+        if index != 0 { output.append(44 as uint8) }
+        output.append(91 as uint8)
+        append_json_string(output, message.name)
+        output.append(44 as uint8)
+        append_json_string(output, message.payload)
+        output.append(93 as uint8)
+        index++
+    }
+    output.append(93 as uint8)
+    return C.string(@output[0:output.count()])
+}
+
+func append_json_string(output:&uint8[], value:str) {
+    output.append(34 as uint8)
+    let digits = utf8_bytes("0123456789abcdef")
+    for byte in utf8_bytes(value) {
+        if byte == 34 { append_json_text(output, "\\\"") }
+        elif byte == 92 { append_json_text(output, "\\\\") }
+        elif byte == 8 { append_json_text(output, "\\b") }
+        elif byte == 12 { append_json_text(output, "\\f") }
+        elif byte == 10 { append_json_text(output, "\\n") }
+        elif byte == 13 { append_json_text(output, "\\r") }
+        elif byte == 9 { append_json_text(output, "\\t") }
+        elif byte < 32 {
+            append_json_text(output, "\\u00")
+            output.append(digits[(byte / 16) as int])
+            output.append(digits[(byte % 16) as int])
+        } else { output.append(byte) }
+    }
+    output.append(34 as uint8)
+}
+
+func append_json_text(output:&uint8[], value:str) {
+    for byte in utf8_bytes(value) { output.append(byte) }
+}
+
+func bridge_script() str {
+    return "" +
+        "(()=>{" +
+        "const listeners=new Map();let outgoing=[];let scheduled=false;" +
+        "const flush=()=>{scheduled=false;const batch=outgoing;outgoing=[];window.__silexPost(JSON.stringify(batch));};" +
+        "window.silex={" +
+        "send(name,payload=''){outgoing.push([String(name),String(payload)]);if(!scheduled){scheduled=true;queueMicrotask(flush);}}," +
+        "on(name,listener){name=String(name);let group=listeners.get(name);if(!group){group=[];listeners.set(name,group);}group.push(listener);return()=>{const index=group.indexOf(listener);if(index>=0)group.splice(index,1);};}" +
+        "};" +
+        "window.__silexReceive=batch=>{for(const [name,payload] of batch){const group=listeners.get(name);if(group){for(const listener of [...group])listener(payload);}}};" +
+        "})();"
+}
+
+contribute GFX.Plugins {
+    public use GFX.WebView.Plugin as WebView
+    public use GFX.WebView.Settings as WebViewSettings
+}
+
+contribute GFX.Resources {
+    public use GFX.WebView.View as WebView
+}

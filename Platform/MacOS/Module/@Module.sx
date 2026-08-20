@@ -1,0 +1,435 @@
+use Interop.C
+use Interop.Boundary
+
+func available() bool { return true }
+func unavailable_reason() str { return "" }
+
+func create(
+    window:uint,
+    document:str,
+    initialization_script:str,
+    bridge_context:uint,
+    bridge_callback:uint
+) uint {
+    let pool = object_message(system_class("NSAutoreleasePool"), "new")
+    let view = object_message(system_class("WKWebView"), "new")
+    if view == 0 as uint {
+        drain(pool)
+        return 0 as uint
+    }
+
+    let content = object_message(window, "contentView")
+    if content == 0 as uint {
+        void_message(view, "release")
+        drain(pool)
+        return 0 as uint
+    }
+    if !attach_bridge(view, initialization_script, bridge_context, bridge_callback) {
+        void_message(view, "release")
+        drain(pool)
+        return 0 as uint
+    }
+    void_bool_message(view, "setTranslatesAutoresizingMaskIntoConstraints:", false)
+    void_object_message(content, "addSubview:", view)
+    constrain(view, content)
+    if !load(view, document) {
+        destroy(view)
+        drain(pool)
+        return 0 as uint
+    }
+    drain(pool)
+    return view
+}
+
+func bridge_script() str {
+    return "window.__silexPost=message=>window.webkit.messageHandlers.silex.postMessage(message);"
+}
+
+func send(view:uint, encoded_batch:str) bool {
+    let pool = object_message(system_class("NSAutoreleasePool"), "new")
+    let source = native_string("window.__silexReceive(" + encoded_batch + ");")
+    if source == 0 as uint {
+        drain(pool)
+        return false
+    }
+    void_two_objects_message(view, "evaluateJavaScript:completionHandler:", source, 0 as uint)
+    drain(pool)
+    return true
+}
+
+func load(view:uint, document:str) bool {
+    let pool = object_message(system_class("NSAutoreleasePool"), "new")
+    let text = object_pointer_message(
+        system_class("NSString"),
+        "stringWithUTF8String:",
+        C.address_bits(C.terminated_pointer(document))
+    )
+    if text == 0 as uint {
+        drain(pool)
+        return false
+    }
+    let loaded = object_two_objects_message(view, "loadHTMLString:baseURL:", text, 0 as uint) != 0 as uint
+    drain(pool)
+    return loaded
+}
+
+func set_visible(view:uint, visible:bool) {
+    void_bool_message(view, "setHidden:", !visible)
+}
+
+func is_visible(view:uint) bool {
+    return !bool_message(view, "isHidden")
+}
+
+func loading(view:uint) bool {
+    return bool_message(view, "isLoading")
+}
+
+func set_background(window:uint, view:uint, red:float, green:float, blue:float, alpha:float) {
+    let pool = object_message(system_class("NSAutoreleasePool"), "new")
+    let color = color_message(
+        system_class("NSColor"),
+        "colorWithSRGBRed:green:blue:alpha:",
+        red as float64,
+        green as float64,
+        blue as float64,
+        alpha as float64
+    )
+    if color != 0 as uint {
+        void_object_message(window, "setBackgroundColor:", color)
+        void_object_message(view, "setUnderPageBackgroundColor:", color)
+    }
+    drain(pool)
+}
+
+func simulate_close_request(window:uint) {
+    void_object_message(window, "performClose:", 0 as uint)
+}
+
+func destroy(view:uint) {
+    if view == 0 as uint { return }
+    let configuration = object_message(view, "configuration")
+    let controller = object_message(configuration, "userContentController")
+    let name = native_string("silex")
+    if controller != 0 as uint && name != 0 as uint {
+        void_object_message(controller, "removeScriptMessageHandlerForName:", name)
+    }
+    void_message(view, "removeFromSuperview")
+    void_message(view, "release")
+}
+
+func attach_bridge(
+    view:uint,
+    initialization_script:str,
+    bridge_context:uint,
+    bridge_callback:uint
+) bool {
+    let handler_class = message_handler_class(bridge_callback)
+    if handler_class == 0 as uint { return false }
+    let configuration = object_message(view, "configuration")
+    let controller = object_message(configuration, "userContentController")
+    let handler = object_message(handler_class, "new")
+    let name = native_string("silex")
+    if controller == 0 as uint || handler == 0 as uint || name == 0 as uint {
+        if handler != 0 as uint { void_message(handler, "release") }
+        return false
+    }
+    objc_set_associated_object(
+        C.pointer_bits(handler),
+        C.pointer_bits(context_key()),
+        C.pointer_bits(bridge_context),
+        0 as uint
+    )
+    void_two_objects_message(controller, "addScriptMessageHandler:name:", handler, name)
+    void_message(handler, "release")
+    return add_initialization_script(controller, initialization_script)
+}
+
+func add_initialization_script(controller:uint, source:str) bool {
+    let native_source = native_string(source)
+    let allocated = object_message(system_class("WKUserScript"), "alloc")
+    if native_source == 0 as uint || allocated == 0 as uint { return false }
+    let script = object_object_uint_bool_message(
+        allocated,
+        "initWithSource:injectionTime:forMainFrameOnly:",
+        native_source,
+        0 as uint,
+        true
+    )
+    if script == 0 as uint { return false }
+    void_object_message(controller, "addUserScript:", script)
+    void_message(script, "release")
+    return true
+}
+
+func message_handler_class(bridge_callback:uint) uint {
+    let name = "SilexGFXWebViewMessageHandler"
+    let existing = system_class(name)
+    if existing != 0 as uint { return existing }
+    let allocated = C.address_bits(objc_allocate_class_pair(
+        C.pointer_bits(system_class("NSObject")), C.terminated_pointer(name), 0 as uint
+    ))
+    if allocated == 0 as uint { return 0 as uint }
+    let protocol_handle = C.address_bits(objc_get_protocol(C.terminated_pointer("WKScriptMessageHandler")))
+    if protocol_handle != 0 as uint {
+        class_add_protocol(C.pointer_bits(allocated), C.pointer_bits(protocol_handle))
+    }
+    if class_add_method(
+        C.pointer_bits(allocated),
+        C.pointer_bits(selector("userContentController:didReceiveScriptMessage:")),
+        C.pointer_bits(bridge_callback),
+        C.terminated_pointer("v@:@@")
+    ) == 0 {
+        return 0 as uint
+    }
+    objc_register_class_pair(C.pointer_bits(allocated))
+    return allocated
+}
+
+func message_context(handler:uint) uint {
+    return C.address_bits(objc_get_associated_object(
+        C.pointer_bits(handler), C.pointer_bits(context_key())
+    ))
+}
+
+func message_text(message:uint) str {
+    if message == 0 as uint { return "" }
+    let body = object_message(message, "body")
+    if body == 0 as uint { return "" }
+    if object_object_message(body, "isKindOfClass:", system_class("NSString")) == 0 as uint { return "" }
+    return copy_text(object_message(body, "UTF8String"))
+}
+
+func context_key() uint { return selector("silexBridgeContext") }
+
+func native_string(text:str) uint {
+    return object_pointer_message(
+        system_class("NSString"),
+        "stringWithUTF8String:",
+        C.address_bits(C.terminated_pointer(text))
+    )
+}
+
+func copy_text(address:uint) str {
+    if address == 0 as uint { return "" }
+    var bytes:uint8[] = []
+    var index = 0
+    while index < 16777216 {
+        let byte = C.load<uint8>(address, index as uint)
+        if byte == 0 { return C.string(@bytes[0:bytes.count()]) }
+        bytes.append(byte)
+        index++
+    }
+    return ""
+}
+
+func drain(pool:uint) {
+    if pool != 0 as uint { void_message(pool, "drain") }
+}
+
+func constrain(view:uint, content:uint) {
+    let leading = object_object_message(
+        object_message(view, "leadingAnchor"),
+        "constraintEqualToAnchor:",
+        object_message(content, "leadingAnchor")
+    )
+    let trailing = object_object_message(
+        object_message(view, "trailingAnchor"),
+        "constraintEqualToAnchor:",
+        object_message(content, "trailingAnchor")
+    )
+    let top = object_object_message(
+        object_message(view, "topAnchor"),
+        "constraintEqualToAnchor:",
+        object_message(content, "topAnchor")
+    )
+    let bottom = object_object_message(
+        object_message(view, "bottomAnchor"),
+        "constraintEqualToAnchor:",
+        object_message(content, "bottomAnchor")
+    )
+    var constraints:uint[4] = [leading, trailing, top, bottom]
+    let values = object_pointer_count_message(
+        system_class("NSArray"),
+        "arrayWithObjects:count:",
+        C.address_bits(C.mutable_pointer(constraints)),
+        4 as uint
+    )
+    void_object_message(system_class("NSLayoutConstraint"), "activateConstraints:", values)
+}
+
+func system_class(name:str) uint {
+    return C.address_bits(objc_get_class(C.terminated_pointer(name)))
+}
+
+func selector(name:str) uint {
+    return C.address_bits(sel_register_name(C.terminated_pointer(name)))
+}
+
+func object_message(receiver:uint, name:str) uint {
+    return C.address_bits(objc_send_object(C.pointer_bits(receiver), C.pointer_bits(selector(name))))
+}
+
+func object_pointer_message(receiver:uint, name:str, value:uint) uint {
+    return C.address_bits(objc_send_object_pointer(
+        C.pointer_bits(receiver), C.pointer_bits(selector(name)), C.pointer_bits(value)
+    ))
+}
+
+func object_object_message(receiver:uint, name:str, value:uint) uint {
+    return object_pointer_message(receiver, name, value)
+}
+
+func object_two_objects_message(receiver:uint, name:str, first:uint, second:uint) uint {
+    return C.address_bits(objc_send_object_two_objects(
+        C.pointer_bits(receiver), C.pointer_bits(selector(name)), C.pointer_bits(first), C.pointer_bits(second)
+    ))
+}
+
+func object_object_uint_bool_message(
+    receiver:uint,
+    name:str,
+    object:uint,
+    integer:uint,
+    boolean:bool
+) uint {
+    var native_boolean:int32 = 0
+    if boolean { native_boolean = 1 }
+    return C.address_bits(objc_send_object_object_uint_bool(
+        C.pointer_bits(receiver),
+        C.pointer_bits(selector(name)),
+        C.pointer_bits(object),
+        integer,
+        native_boolean
+    ))
+}
+
+func void_two_objects_message(receiver:uint, name:str, first:uint, second:uint) {
+    objc_send_void_two_objects(
+        C.pointer_bits(receiver), C.pointer_bits(selector(name)), C.pointer_bits(first), C.pointer_bits(second)
+    )
+}
+
+func object_pointer_count_message(receiver:uint, name:str, values:uint, count:uint) uint {
+    return C.address_bits(objc_send_object_pointer_count(
+        C.pointer_bits(receiver), C.pointer_bits(selector(name)), C.pointer_bits(values), count
+    ))
+}
+
+func color_message(
+    receiver:uint,
+    name:str,
+    red:float64,
+    green:float64,
+    blue:float64,
+    alpha:float64,
+) uint {
+    return C.address_bits(objc_send_color(
+        C.pointer_bits(receiver), C.pointer_bits(selector(name)), red, green, blue, alpha
+    ))
+}
+
+func void_message(receiver:uint, name:str) {
+    objc_send_void(C.pointer_bits(receiver), C.pointer_bits(selector(name)))
+}
+
+func void_object_message(receiver:uint, name:str, value:uint) {
+    objc_send_void_object(C.pointer_bits(receiver), C.pointer_bits(selector(name)), C.pointer_bits(value))
+}
+
+func void_bool_message(receiver:uint, name:str, value:bool) {
+    var native:int32 = 0
+    if value { native = 1 }
+    objc_send_void_bool(C.pointer_bits(receiver), C.pointer_bits(selector(name)), native)
+}
+
+func bool_message(receiver:uint, name:str) bool {
+    return objc_send_bool(C.pointer_bits(receiver), C.pointer_bits(selector(name))) != 0
+}
+
+let objc_get_class = C.function<func(C.Pointer<uint8>) C.Pointer<uint8> >(
+    library:Boundary.System,
+    name:"objc_getClass"
+)
+
+let sel_register_name = C.function<func(C.Pointer<uint8>) C.Pointer<uint8> >(
+    library:Boundary.System,
+    name:"sel_registerName"
+)
+
+let objc_send_object = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>
+) C.Pointer<uint8> >(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_object_pointer = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>
+) C.Pointer<uint8> >(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_object_two_objects = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>
+) C.Pointer<uint8> >(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_object_object_uint_bool = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>, uint, int32
+) C.Pointer<uint8> >(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_object_pointer_count = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>, uint
+) C.Pointer<uint8> >(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_color = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, float64, float64, float64, float64
+) C.Pointer<uint8> >(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_void = C.function<func(C.Pointer<uint8>, C.Pointer<uint8>) void>(
+    library:Boundary.System,
+    name:"objc_msgSend"
+)
+
+let objc_send_void_object = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>
+) void>(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_void_two_objects = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>
+) void>(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_void_bool = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, int32
+) void>(library:Boundary.System, name:"objc_msgSend")
+
+let objc_send_bool = C.function<func(C.Pointer<uint8>, C.Pointer<uint8>) int32>(
+    library:Boundary.System,
+    name:"objc_msgSend"
+)
+
+let objc_allocate_class_pair = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, uint
+) C.Pointer<uint8> >(library:Boundary.System, name:"objc_allocateClassPair")
+
+let objc_register_class_pair = C.function<func(C.Pointer<uint8>) void>(
+    library:Boundary.System,
+    name:"objc_registerClassPair"
+)
+
+let objc_get_protocol = C.function<func(C.Pointer<uint8>) C.Pointer<uint8> >(
+    library:Boundary.System,
+    name:"objc_getProtocol"
+)
+
+let class_add_protocol = C.function<func(C.Pointer<uint8>, C.Pointer<uint8>) int32>(
+    library:Boundary.System,
+    name:"class_addProtocol"
+)
+
+let class_add_method = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>
+) int32>(library:Boundary.System, name:"class_addMethod")
+
+let objc_set_associated_object = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>, C.Pointer<uint8>, uint
+) void>(library:Boundary.System, name:"objc_setAssociatedObject")
+
+let objc_get_associated_object = C.function<func(
+    C.Pointer<uint8>, C.Pointer<uint8>
+) C.Pointer<uint8> >(library:Boundary.System, name:"objc_getAssociatedObject")
