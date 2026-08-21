@@ -538,7 +538,6 @@ func bridge_script() str {
 
 contribute GFX.Plugins {
     public use GFX.WebView.Plugin as WebView
-    public use GFX.WebView.Settings as WebViewSettings
 }
 
 contribute GFX.Resources {

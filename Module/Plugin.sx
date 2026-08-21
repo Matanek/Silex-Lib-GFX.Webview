@@ -1,18 +1,31 @@
 use GFX.Application.Plugin as PluginProtocol
 use GFX.Application
 use GFX.Application.Schedule
+use GFX.Color
 use GFX.Window.Plugin as WindowPlugin
 use GFX.WebView.Site
-use GFX.WebView.Settings
+use GFX.WebView.Settings as ViewSettings
 use GFX.WebView.View
 use GFX.Window
 
 struct Configuration {
     let site:Site
-    let settings:Settings
+    let settings:ViewSettings
 }
 
 public struct Plugin:PluginProtocol {
+    struct Settings {
+        var background:Color = Color(r:0.0, g:0.0, b:0.0, a:0.0)
+        var context_menu:bool = false
+
+        package func view() ViewSettings {
+            return ViewSettings(
+                background:self.background,
+                context_menu:self.context_menu
+            )
+        }
+    }
+
     private let site:Site?
     private let settings:Settings
 
@@ -28,7 +41,7 @@ public struct Plugin:PluginProtocol {
         if let site = self.site {
             application.add_resource(Configuration(
                 site:site,
-                settings:self.settings
+                settings:self.settings.view()
             ))
         } else {
             panic("GFX.WebView.Plugin requires a site")
