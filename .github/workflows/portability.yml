@@ -73,10 +73,12 @@ jobs:
           "$silex" install JSON
           "$silex" link "$GITHUB_WORKSPACE/GFX"
           "$silex" link "$GITHUB_WORKSPACE/GFX.WebView"
-          xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEO_DRIVER=x11 \
+          webview_output=$(xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEO_DRIVER=x11 \
             NO_AT_BRIDGE=1 LIBGL_ALWAYS_SOFTWARE=1 \
             WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 \
-            "$silex" test "$GITHUB_WORKSPACE/GFX.WebView/Tests"
+            "$silex" test "$GITHUB_WORKSPACE/GFX.WebView/Tests")
+          printf '%s\n' "$webview_output"
+          grep -Fxq '5 passed; 0 failed in 4 files' <<< "$webview_output"
 
   windows-x64:
     runs-on: windows-2025
@@ -144,7 +146,12 @@ jobs:
           & $silex install JSON
           & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX")
           & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView")
-          & $silex test (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests")
+          $webViewOutput = @(& $silex test (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests"))
+          $testExitCode = $LASTEXITCODE
+          $webViewOutput | ForEach-Object { Write-Output $_ }
+          if ($testExitCode -ne 0 -or -not ($webViewOutput -contains "5 passed; 0 failed in 4 files")) {
+            throw "expected all four WebView test files to pass, native exit code: $testExitCode"
+          }
 
       - name: Cross-compile the Windows ARM64 fragment
         shell: pwsh
