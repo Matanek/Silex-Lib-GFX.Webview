@@ -34,6 +34,13 @@ jobs:
           ref: 94adcd6747a3edd01a3b8552b46f12b087c7cdae
           path: STD
 
+      - name: Check out the exact GFX checkpoint
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX
+          ref: 0d92e1cb1ec321517440566dd989602264a96470
+          path: GFX
+
       - name: Install WebKitGTK and Zig
         shell: bash
         run: |
@@ -63,8 +70,8 @@ jobs:
           "$silex" setup
           "$silex" link "$GITHUB_WORKSPACE/STD"
           "$silex" install JSON
-          "$silex" install GFX
-          xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEODRIVER=x11 \
+          "$silex" install "$GITHUB_WORKSPACE/GFX"
+          xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEO_DRIVER=x11 \
             NO_AT_BRIDGE=1 LIBGL_ALWAYS_SOFTWARE=1 \
             WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 \
             "$silex" test "$GITHUB_WORKSPACE/GFX.WebView/Tests"
@@ -91,6 +98,13 @@ jobs:
           repository: Matanek/Silex-Lib-STD
           ref: 94adcd6747a3edd01a3b8552b46f12b087c7cdae
           path: STD
+
+      - name: Check out the exact GFX checkpoint
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX
+          ref: 0d92e1cb1ec321517440566dd989602264a96470
+          path: GFX
 
       - name: Install Zig
         shell: pwsh
@@ -125,7 +139,7 @@ jobs:
           & $silex setup
           & $silex link (Join-Path $env:GITHUB_WORKSPACE "STD")
           & $silex install JSON
-          & $silex install GFX
+          & $silex install (Join-Path $env:GITHUB_WORKSPACE "GFX")
           & $silex test (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests")
 
       - name: Cross-compile the Windows ARM64 fragment
@@ -136,7 +150,7 @@ jobs:
           $silex = Join-Path $env:RUNNER_TEMP "silex-prefix/bin/silex.exe"
           & $silex install STD --target windows-arm64
           & $silex install JSON --target windows-arm64
-          & $silex install GFX --target windows-arm64
+          & $silex install (Join-Path $env:GITHUB_WORKSPACE "GFX") --target windows-arm64
           & $silex compile (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Examples/BridgeWebPage.sx") `
             --target windows-arm64 `
             -o (Join-Path $env:RUNNER_TEMP "webview-arm64.exe")
