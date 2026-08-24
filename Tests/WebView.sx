@@ -10,11 +10,14 @@ test "attach a system WebView to a GFX window" {
         height:240,
         hidden:true
     ))
+    print("GFX_WEBVIEW_CHECKPOINT window-ready")
     var site = WebView.Site.html(embed_text("Fixtures/index.html"))
     site.add(WebView.Asset.css(embed_text("Fixtures/app.css"), path:"/app.css"))
     site.add(WebView.Asset.javascript(embed_text("Fixtures/app.js")))
+    print("GFX_WEBVIEW_CHECKPOINT site-ready")
 
     var view = WebView.View(window, site)
+    print("GFX_WEBVIEW_CHECKPOINT view-ready")
     var input = Input()
     var ready_attempts = 0
     while view.status() == WebView.Status.loading && ready_attempts < 250 {
@@ -24,12 +27,14 @@ test "attach a system WebView to a GFX window" {
     }
     assert(view.is_visible())
     assert(view.status() == WebView.Status.ready)
+    print("GFX_WEBVIEW_CHECKPOINT document-ready")
 
     let message_count = 256
     view.send("context-menu-state")
     view.send("inline-ping", "inline script connected")
     for index in 0...message_count { view.send("ping", "$(index)") }
     assert(view.flush())
+    print("GFX_WEBVIEW_CHECKPOINT bridge-flushed")
 
     var received = 0
     var context_menu_disabled = false
@@ -56,6 +61,7 @@ test "attach a system WebView to a GFX window" {
     assert(received == message_count)
     assert(context_menu_disabled)
     assert(inline_script_connected)
+    print("GFX_WEBVIEW_CHECKPOINT bridge-received")
 
     view.set_visible(false)
     assert(!view.is_visible())
@@ -63,5 +69,6 @@ test "attach a system WebView to a GFX window" {
     view.set_background(Color.blue_100())
     view.reload()
     assert(view.status() == WebView.Status.loading || view.status() == WebView.Status.ready)
+    print("GFX_WEBVIEW_CHECKPOINT reload-ready")
 
 }

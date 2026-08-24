@@ -55,6 +55,8 @@ jobs:
           "$silex" install JSON
           "$silex" install GFX
           xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEODRIVER=x11 \
+            NO_AT_BRIDGE=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 \
             "$silex" test "$GITHUB_WORKSPACE/Tests"
 
   windows-x64:

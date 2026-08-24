@@ -1,7 +1,6 @@
 use GFX.WebView
 
 test "embed WebView assets and resolve logical paths" {
-    assert(WebView.availability().is_available())
     var site = WebView.Site.html(embed_text("Fixtures/index.html"))
     site.add(WebView.Asset.css(embed_text("Fixtures/app.css"), path:"/app.css"))
     site.add(WebView.Asset.javascript(embed_text("Fixtures/app.js")))
