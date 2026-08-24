@@ -8,7 +8,7 @@ test "attach a system WebView to a GFX window" {
         title:"GFX.WebView native smoke",
         width:320,
         height:240,
-        hidden:true
+        hidden:false
     ))
     print("GFX_WEBVIEW_CHECKPOINT window-ready")
     var site = WebView.Site.html(embed_text("Fixtures/index.html"))

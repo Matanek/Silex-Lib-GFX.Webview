@@ -154,7 +154,8 @@ jobs:
           $silex = Join-Path $env:RUNNER_TEMP "silex-prefix/bin/silex.exe"
           & $silex install STD --target windows-arm64
           & $silex install JSON --target windows-arm64
-          & $silex install (Join-Path $env:GITHUB_WORKSPACE "GFX") --target windows-arm64
+          & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX") --target windows-arm64
+          & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView") --target windows-arm64
           & $silex compile (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Examples/BridgeWebPage.sx") `
             --target windows-arm64 `
             -o (Join-Path $env:RUNNER_TEMP "webview-arm64.exe")

@@ -1,0 +1,4 @@
+Tests/Fixtures/*.css text eol=lf
+Tests/Fixtures/*.html text eol=lf
+Tests/Fixtures/*.js text eol=lf
+Boundary/**/*.lib binary
