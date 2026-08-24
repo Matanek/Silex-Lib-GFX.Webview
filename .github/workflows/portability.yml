@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-GFX
-          ref: 0d92e1cb1ec321517440566dd989602264a96470
+          ref: 0d92e1c940c7df3e6d8a90f95c5d83306376e472
           path: GFX
 
       - name: Install WebKitGTK and Zig
@@ -103,7 +103,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-GFX
-          ref: 0d92e1cb1ec321517440566dd989602264a96470
+          ref: 0d92e1c940c7df3e6d8a90f95c5d83306376e472
           path: GFX
 
       - name: Install Zig
