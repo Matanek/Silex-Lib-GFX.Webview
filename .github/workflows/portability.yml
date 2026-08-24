@@ -5,6 +5,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
@@ -30,7 +31,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-STD
-          ref: 7e1b028f8d899f1d6730c4f56ba225b89bc2d8d0
+          ref: 94adcd6747a3edd01a3b8552b46f12b087c7cdae
           path: STD
 
       - name: Install WebKitGTK and Zig
@@ -88,7 +89,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-STD
-          ref: 7e1b028f8d899f1d6730c4f56ba225b89bc2d8d0
+          ref: 94adcd6747a3edd01a3b8552b46f12b087c7cdae
           path: STD
 
       - name: Install Zig
