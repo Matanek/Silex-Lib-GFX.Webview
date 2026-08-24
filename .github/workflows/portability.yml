@@ -60,10 +60,9 @@ jobs:
           mkdir -p "$HOME"
           silex="$RUNNER_TEMP/silex-prefix/bin/silex"
           "$silex" setup
-          "$silex" install STD
+          "$silex" link "$GITHUB_WORKSPACE/STD"
           "$silex" install JSON
           "$silex" install GFX
-          "$silex" link "$GITHUB_WORKSPACE/STD"
           xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEODRIVER=x11 \
             NO_AT_BRIDGE=1 LIBGL_ALWAYS_SOFTWARE=1 \
             WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 \
@@ -123,10 +122,9 @@ jobs:
           New-Item -ItemType Directory -Force $env:USERPROFILE | Out-Null
           $silex = Join-Path $env:RUNNER_TEMP "silex-prefix/bin/silex.exe"
           & $silex setup
-          & $silex install STD
+          & $silex link (Join-Path $env:GITHUB_WORKSPACE "STD")
           & $silex install JSON
           & $silex install GFX
-          & $silex link (Join-Path $env:GITHUB_WORKSPACE "STD")
           & $silex test (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests")
 
       - name: Cross-compile the Windows ARM64 fragment
