@@ -71,7 +71,9 @@ jobs:
           "$silex" setup
           "$silex" link "$GITHUB_WORKSPACE/STD"
           "$silex" install JSON
+          "$silex" install GFX
           "$silex" install "$GITHUB_WORKSPACE/GFX"
+          "$silex" link "$GITHUB_WORKSPACE/GFX.WebView"
           xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEO_DRIVER=x11 \
             NO_AT_BRIDGE=1 LIBGL_ALWAYS_SOFTWARE=1 \
             WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 \
@@ -141,7 +143,9 @@ jobs:
           & $silex setup
           & $silex link (Join-Path $env:GITHUB_WORKSPACE "STD")
           & $silex install JSON
+          & $silex install GFX
           & $silex install (Join-Path $env:GITHUB_WORKSPACE "GFX")
+          & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView")
           & $silex test (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests")
 
       - name: Cross-compile the Windows ARM64 fragment
