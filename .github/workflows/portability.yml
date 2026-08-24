@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex
+          ref: d2d8907131de1b0f0de9c8741b0fed020cf60925
           path: _silex
 
       - name: Check out the exact STD checkpoint
@@ -38,7 +39,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-GFX
-          ref: 0d92e1c940c7df3e6d8a90f95c5d83306376e472
+          ref: 247323c7082a2e2250ced2e4dd120ee5bede9e93
           path: GFX
 
       - name: Install WebKitGTK and Zig
@@ -90,6 +91,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex
+          ref: d2d8907131de1b0f0de9c8741b0fed020cf60925
           path: _silex
 
       - name: Check out the exact STD checkpoint
@@ -103,7 +105,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-GFX
-          ref: 0d92e1c940c7df3e6d8a90f95c5d83306376e472
+          ref: 247323c7082a2e2250ced2e4dd120ee5bede9e93
           path: GFX
 
       - name: Install Zig

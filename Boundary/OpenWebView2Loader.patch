@@ -1,0 +1,20 @@
+diff --git a/Source/WebView2Loader.cpp b/Source/WebView2Loader.cpp
+index 3c1b0cc..e959d68 100644
+--- a/Source/WebView2Loader.cpp
++++ b/Source/WebView2Loader.cpp
+@@ -141,12 +141,11 @@ class EnvironmentCreatedRetryHandler
+     return E_NOINTERFACE;
+   }
+   ULONG STDMETHODCALLTYPE AddRef() override {
+-    InterlockedIncrement(&m_cRef);
+-    return m_cRef;
++    return static_cast<ULONG>(__atomic_add_fetch(&m_cRef, 1, __ATOMIC_SEQ_CST));
+   }
+   ULONG STDMETHODCALLTYPE Release() override {
+-    ULONG ulRefCount = InterlockedDecrement(&m_cRef);
+-    if (m_cRef == 0) {
++    ULONG ulRefCount = static_cast<ULONG>(__atomic_sub_fetch(&m_cRef, 1, __ATOMIC_SEQ_CST));
++    if (ulRefCount == 0) {
+       delete this;
+     }
+     return ulRefCount;

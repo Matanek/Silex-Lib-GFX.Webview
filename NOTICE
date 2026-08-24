@@ -6,6 +6,6 @@ This product is licensed under the Apache License, Version 2.0.
 GFX.WebView uses browser facilities supplied by the selected operating system
 and does not distribute a browser engine.
 
-The Windows package includes WebView2LoaderStatic.lib from Microsoft.Web.WebView2
-1.0.4129.50. Its license and third-party notices are reproduced under
-`Licenses/`.
+The Windows package includes a MinGW-compatible build of OpenWebView2Loader and
+Microsoft WebView2 headers from Microsoft.Web.WebView2 1.0.4129.50. Their
+licenses and the WebView2 third-party notices are reproduced under `Licenses/`.
