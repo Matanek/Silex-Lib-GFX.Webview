@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Check out GFX.WebView
         uses: actions/checkout@v6
+        with:
+          path: GFX.WebView
 
       - name: Check out the Silex compiler
         uses: actions/checkout@v6
@@ -57,7 +59,7 @@ jobs:
           xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEODRIVER=x11 \
             NO_AT_BRIDGE=1 LIBGL_ALWAYS_SOFTWARE=1 \
             WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 \
-            "$silex" test "$GITHUB_WORKSPACE/Tests"
+            "$silex" test "$GITHUB_WORKSPACE/GFX.WebView/Tests"
 
   windows-x64:
     runs-on: windows-2025
@@ -66,6 +68,8 @@ jobs:
     steps:
       - name: Check out GFX.WebView
         uses: actions/checkout@v6
+        with:
+          path: GFX.WebView
 
       - name: Check out the Silex compiler
         uses: actions/checkout@v6
@@ -107,7 +111,7 @@ jobs:
           & $silex install STD
           & $silex install JSON
           & $silex install GFX
-          & $silex test (Join-Path $env:GITHUB_WORKSPACE "Tests")
+          & $silex test (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests")
 
       - name: Cross-compile the Windows ARM64 fragment
         shell: pwsh
@@ -118,6 +122,6 @@ jobs:
           & $silex install STD --target windows-arm64
           & $silex install JSON --target windows-arm64
           & $silex install GFX --target windows-arm64
-          & $silex compile (Join-Path $env:GITHUB_WORKSPACE "Examples/BridgeWebPage.sx") `
+          & $silex compile (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Examples/BridgeWebPage.sx") `
             --target windows-arm64 `
             -o (Join-Path $env:RUNNER_TEMP "webview-arm64.exe")
