@@ -1,0 +1,11 @@
+use Interop.C
+
+func put_bounds(method:uint, controller:uint, rectangle:uint) int32 {
+    // Windows ARM64 passes the two eight-byte RECT chunks in x1 and x2.
+    return C.call<func(uint, uint, uint) int32>(
+        method,
+        controller,
+        C.load<uint>(rectangle, 0 as uint),
+        C.load<uint>(rectangle, 8 as uint)
+    )
+}

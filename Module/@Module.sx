@@ -351,6 +351,7 @@ public class View {
     }
 
     func status() Status {
+        Platform.update(self.handle)
         if Platform.loading(self.handle) { return Status.loading }
         return Status.ready
     }
@@ -371,7 +372,10 @@ public class View {
         return false
     }
 
-    func receive() Message[] { return self.bridge.take_incoming() }
+    func receive() Message[] {
+        Platform.update(self.handle)
+        return self.bridge.take_incoming()
+    }
 
     module func received_batch_count() int { return self.bridge.received_batch_count() }
     module func sent_batch_count() int { return self.bridge.sent_batch_count() }

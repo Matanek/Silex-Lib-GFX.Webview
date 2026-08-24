@@ -1,11 +1,23 @@
-// Temporary target-complete adapter. It remains unavailable until WebView can
-// host a WPE WebKit surface inside the GFX window without a second toolkit
-// window or a per-frame GTK pump.
-func available() bool { return false }
+use Interop.C
+use Interop.Boundary
+
+// Private x64 layout: host, WebView, manager, X display, parent XID, child XID,
+// message signal, bridge context, bridge callback, visible flag.
+func state_size() C.Size { return 80 as C.Size }
+
+func available() bool {
+    if gtk_init_check(0 as uint, 0 as uint) == 0 { return false }
+    let probe = gtk_window_new(1)
+    if probe == 0 as uint { return false }
+    let display = gtk_widget_get_display(probe)
+    let x11 = x11_display(display)
+    gtk_widget_destroy(probe)
+    pump_events()
+    return x11 != 0 as uint
+}
 
 func unavailable_reason() str {
-    return "the Linux adapter requires an embeddable system WebKit surface; " +
-        "GTK 4 cannot attach WebKitGTK to the foreign GFX window, and the WPE backend is not implemented yet"
+    return "the Linux adapter requires WebKitGTK 4.1 and an X11 or XWayland GFX window"
 }
 
 func create(
@@ -15,51 +27,299 @@ func create(
     bridge_context:uint,
     bridge_callback:uint
 ) uint {
-    unavailable()
-    return 0 as uint
+    if window == 0 as uint || bridge_callback == 0 as uint || !available() { return 0 as uint }
+    let state = C.address_bits(calloc(1 as C.Size, state_size()))
+    if state == 0 as uint { return 0 as uint }
+    C.store<uint>(state, 32 as uint, window)
+    C.store<uint>(state, 56 as uint, bridge_context)
+    C.store<uint>(state, 64 as uint, bridge_callback)
+    C.store<int32>(state, 72 as uint, 1)
+
+    let manager = webkit_user_content_manager_new()
+    C.store<uint>(state, 16 as uint, manager)
+    if manager == 0 as uint { destroy(state); return 0 as uint }
+    let callback:func(uint, uint, uint) void = receive_message
+    let signal = g_signal_connect_data(
+        manager,
+        C.terminated_pointer("script-message-received::silex"),
+        C.function_address(callback),
+        state,
+        0 as uint,
+        0
+    )
+    C.store<uint>(state, 48 as uint, signal)
+    if webkit_user_content_manager_register_script_message_handler(
+        manager, C.terminated_pointer("silex")
+    ) == 0 { destroy(state); return 0 as uint }
+
+    let script = webkit_user_script_new(
+        C.terminated_pointer(initialization_script), 0, 0, 0 as uint, 0 as uint
+    )
+    if script == 0 as uint { destroy(state); return 0 as uint }
+    webkit_user_content_manager_add_script(manager, script)
+    webkit_user_script_unref(script)
+
+    let web_view = webkit_web_view_new_with_user_content_manager(manager)
+    let host = gtk_window_new(1)
+    C.store<uint>(state, 8 as uint, web_view)
+    C.store<uint>(state, 0 as uint, host)
+    if web_view != 0 as uint { g_object_unref(manager) }
+    if web_view == 0 as uint || host == 0 as uint { destroy(state); return 0 as uint }
+    gtk_window_set_decorated(host, 0)
+    gtk_window_set_skip_taskbar_hint(host, 1)
+    gtk_window_set_skip_pager_hint(host, 1)
+    gtk_container_add(host, web_view)
+    gtk_widget_realize(host)
+
+    let display = gtk_widget_get_display(host)
+    let gdk_window = gtk_widget_get_window(host)
+    let x11 = x11_display(display)
+    let child = x11_window(gdk_window)
+    C.store<uint>(state, 24 as uint, x11)
+    C.store<uint>(state, 40 as uint, child)
+    if x11 == 0 as uint || child == 0 as uint || !parent_size(state) {
+        destroy(state)
+        return 0 as uint
+    }
+
+    gtk_widget_show_all(host)
+    let reparented = XReparentWindow(x11, child, window, 0, 0)
+    resize(state)
+    webkit_web_view_load_html(web_view, C.terminated_pointer(document), 0 as uint)
+    pump_events()
+    return state
 }
 
-func bridge_script() str { return "window.__silexPost=message=>{};" }
+func bridge_script() str {
+    return "window.__silexPost=message=>window.webkit.messageHandlers.silex.postMessage(message);"
+}
 
-func send(view:uint, encoded_batch:str) bool { return false }
+func send(view:uint, encoded_batch:str) bool {
+    let web_view = field(view, 8)
+    if web_view == 0 as uint { return false }
+    let source = "window.__silexReceive(" + encoded_batch + ");"
+    webkit_web_view_evaluate_javascript(
+        web_view, C.terminated_pointer(source), -1, 0 as uint, 0 as uint,
+        0 as uint, 0 as uint, 0 as uint
+    )
+    return true
+}
 
-func message_context(handler:uint) uint { return 0 as uint }
-func message_text(message:uint) str { return "" }
+func message_context(handler:uint) uint { return handler }
+func message_text(message:uint) str { return copy_text(message) }
 
 func load(view:uint, document:str) bool {
-    unavailable()
-    return false
+    let web_view = field(view, 8)
+    if web_view == 0 as uint { return false }
+    webkit_web_view_load_html(web_view, C.terminated_pointer(document), 0 as uint)
+    return true
 }
 
 func set_visible(view:uint, visible:bool) {
-    unavailable()
+    let host = field(view, 0)
+    if host == 0 as uint { return }
+    let native_visible = native_bool(visible)
+    C.store<int32>(view, 72 as uint, native_visible)
+    if visible { gtk_widget_show(host) } else { gtk_widget_hide(host) }
 }
 
 func is_visible(view:uint) bool {
-    unavailable()
-    return false
+    return view != 0 as uint && C.load<int32>(view, 72 as uint) != 0
 }
 
 func loading(view:uint) bool {
-    unavailable()
-    return false
+    let web_view = field(view, 8)
+    return web_view != 0 as uint && webkit_web_view_is_loading(web_view) != 0
+}
+
+func update(view:uint) {
+    pump_events()
+    resize(view)
 }
 
 func set_background(window:uint, view:uint, red:float, green:float, blue:float, alpha:float) {
-    unavailable()
+    let web_view = field(view, 8)
+    if web_view == 0 as uint { return }
+    let color = C.address_bits(calloc(1 as C.Size, 32 as C.Size))
+    if color == 0 as uint { return }
+    C.store<float64>(color, 0 as uint, red as float64)
+    C.store<float64>(color, 8 as uint, green as float64)
+    C.store<float64>(color, 16 as uint, blue as float64)
+    C.store<float64>(color, 24 as uint, alpha as float64)
+    webkit_web_view_set_background_color(web_view, color)
+    free(C.pointer_bits(color))
 }
 
 func simulate_close_request(window:uint) {
-    unavailable()
+    if window == 0 as uint || !available() { return }
+    let probe = gtk_window_new(1)
+    if probe == 0 as uint { return }
+    let display = gdk_x11_display_get_xdisplay(gtk_widget_get_display(probe))
+    let event = C.address_bits(calloc(1 as C.Size, 192 as C.Size))
+    if display != 0 as uint && event != 0 as uint {
+        C.store<int32>(event, 0 as uint, 33)
+        C.store<uint>(event, 24 as uint, display)
+        C.store<uint>(event, 32 as uint, window)
+        C.store<uint>(event, 40 as uint, XInternAtom(display, C.terminated_pointer("WM_PROTOCOLS"), 0))
+        C.store<int32>(event, 48 as uint, 32)
+        C.store<uint>(event, 56 as uint, XInternAtom(display, C.terminated_pointer("WM_DELETE_WINDOW"), 0))
+        let sent = XSendEvent(display, window, 0, 0, event)
+        let flushed = XFlush(display)
+    }
+    if event != 0 as uint { free(C.pointer_bits(event)) }
+    gtk_widget_destroy(probe)
+    pump_events()
 }
 
 func destroy(view:uint) {
-    if view != 0 as uint { unavailable() }
+    if view == 0 as uint { return }
+    let manager = field(view, 16)
+    if manager != 0 as uint {
+        webkit_user_content_manager_unregister_script_message_handler(
+            manager, C.terminated_pointer("silex")
+        )
+        let signal = field(view, 48)
+        if signal != 0 as uint { g_signal_handler_disconnect(manager, signal) }
+    }
+    let host = field(view, 0)
+    let web_view = field(view, 8)
+    if web_view == 0 as uint && manager != 0 as uint { g_object_unref(manager) }
+    if host != 0 as uint { gtk_widget_destroy(host) }
+    elif web_view != 0 as uint { gtk_widget_destroy(web_view) }
+    pump_events()
+    free(C.pointer_bits(view))
 }
 
-func unavailable() {
-    panic(
-        "GFX.WebView on Linux needs a WPE WebKit surface that can share the GFX window; " +
-        "opening a separate GTK window would violate the View contract"
-    )
+func field(state:uint, offset:uint) uint {
+    if state == 0 as uint { return 0 as uint }
+    return C.load<uint>(state, offset)
 }
+
+func pump_events() {
+    let context = g_main_context_default()
+    if context == 0 as uint { return }
+    while g_main_context_pending(context) != 0 {
+        let dispatched = g_main_context_iteration(context, 0)
+    }
+}
+
+func parent_size(state:uint) bool {
+    let display = field(state, 24)
+    let parent = field(state, 32)
+    if display == 0 as uint || parent == 0 as uint { return false }
+    let attributes = C.address_bits(calloc(1 as C.Size, 136 as C.Size))
+    if attributes == 0 as uint { return false }
+    let found = XGetWindowAttributes(display, parent, attributes) != 0
+    free(C.pointer_bits(attributes))
+    return found
+}
+
+func resize(state:uint) {
+    let display = field(state, 24)
+    let parent = field(state, 32)
+    let child = field(state, 40)
+    let host = field(state, 0)
+    let web_view = field(state, 8)
+    if display == 0 as uint || parent == 0 as uint || child == 0 as uint { return }
+    let attributes = C.address_bits(calloc(1 as C.Size, 136 as C.Size))
+    if attributes == 0 as uint { return }
+    if XGetWindowAttributes(display, parent, attributes) != 0 {
+        let measured_width = C.load<int32>(attributes, 8 as uint)
+        let measured_height = C.load<int32>(attributes, 12 as uint)
+        var width:int32 = 1
+        var height:int32 = 1
+        if measured_width > 0 { width = measured_width }
+        if measured_height > 0 { height = measured_height }
+        gtk_widget_set_size_request(web_view, width, height)
+        gtk_window_resize(host, width, height)
+        let moved = XMoveResizeWindow(display, child, 0, 0, width as uint32, height as uint32)
+        let flushed = XFlush(display)
+    }
+    free(C.pointer_bits(attributes))
+}
+
+func receive_message(manager:uint, result:uint, context:uint) {
+    if context == 0 as uint { return }
+    let callback = field(context, 64)
+    if callback == 0 as uint { return }
+    let value = webkit_javascript_result_get_js_value(result)
+    var text = 0 as uint
+    if value != 0 as uint { text = jsc_value_to_string(value) }
+    if text == 0 as uint { return }
+    C.call<func(uint, uint, uint, uint) void>(callback, field(context, 56), 0 as uint, 0 as uint, text)
+    g_free(text)
+}
+
+func copy_text(address:uint) str {
+    if address == 0 as uint { return "" }
+    var bytes:uint8[] = []
+    var index = 0
+    while index < 16777216 {
+        let byte = C.load<uint8>(address, index as uint)
+        if byte == 0 { return C.string(@bytes[0:bytes.count()]) }
+        bytes.append(byte)
+        index++
+    }
+    return ""
+}
+
+func x11_display(display:uint) uint {
+    if display == 0 as uint { return 0 as uint }
+    return gdk_x11_display_get_xdisplay(display)
+}
+
+func x11_window(window:uint) uint {
+    if window == 0 as uint { return 0 as uint }
+    return gdk_x11_window_get_xid(window)
+}
+
+func native_bool(value:bool) int32 {
+    if value { return 1 }
+    return 0
+}
+
+let calloc = C.function<func(C.Size, C.Size) C.Pointer<uint8> >(library:Boundary.WebKit, name:"calloc")
+let free = C.function<func(C.Pointer<uint8>) void>(library:Boundary.WebKit, name:"free")
+let gtk_init_check = C.function<func(uint, uint) int32>(library:Boundary.WebKit, name:"gtk_init_check")
+let gtk_window_new = C.function<func(int32) uint>(library:Boundary.WebKit, name:"gtk_window_new")
+let gtk_window_set_decorated = C.function<func(uint, int32) void>(library:Boundary.WebKit, name:"gtk_window_set_decorated")
+let gtk_window_set_skip_taskbar_hint = C.function<func(uint, int32) void>(library:Boundary.WebKit, name:"gtk_window_set_skip_taskbar_hint")
+let gtk_window_set_skip_pager_hint = C.function<func(uint, int32) void>(library:Boundary.WebKit, name:"gtk_window_set_skip_pager_hint")
+let gtk_window_resize = C.function<func(uint, int32, int32) void>(library:Boundary.WebKit, name:"gtk_window_resize")
+let gtk_container_add = C.function<func(uint, uint) void>(library:Boundary.WebKit, name:"gtk_container_add")
+let gtk_widget_realize = C.function<func(uint) void>(library:Boundary.WebKit, name:"gtk_widget_realize")
+let gtk_widget_show = C.function<func(uint) void>(library:Boundary.WebKit, name:"gtk_widget_show")
+let gtk_widget_show_all = C.function<func(uint) void>(library:Boundary.WebKit, name:"gtk_widget_show_all")
+let gtk_widget_hide = C.function<func(uint) void>(library:Boundary.WebKit, name:"gtk_widget_hide")
+let gtk_widget_destroy = C.function<func(uint) void>(library:Boundary.WebKit, name:"gtk_widget_destroy")
+let gtk_widget_set_size_request = C.function<func(uint, int32, int32) void>(library:Boundary.WebKit, name:"gtk_widget_set_size_request")
+let gtk_widget_get_window = C.function<func(uint) uint>(library:Boundary.WebKit, name:"gtk_widget_get_window")
+let gtk_widget_get_display = C.function<func(uint) uint>(library:Boundary.WebKit, name:"gtk_widget_get_display")
+let gdk_x11_display_get_xdisplay = C.function<func(uint) uint>(library:Boundary.WebKit, name:"gdk_x11_display_get_xdisplay")
+let gdk_x11_window_get_xid = C.function<func(uint) uint>(library:Boundary.WebKit, name:"gdk_x11_window_get_xid")
+let XGetWindowAttributes = C.function<func(uint, uint, uint) int32>(library:Boundary.WebKit, name:"XGetWindowAttributes")
+let XReparentWindow = C.function<func(uint, uint, uint, int32, int32) int32>(library:Boundary.WebKit, name:"XReparentWindow")
+let XMoveResizeWindow = C.function<func(uint, uint, int32, int32, uint32, uint32) int32>(library:Boundary.WebKit, name:"XMoveResizeWindow")
+let XFlush = C.function<func(uint) int32>(library:Boundary.WebKit, name:"XFlush")
+let XInternAtom = C.function<func(uint, C.Pointer<uint8>, int32) uint>(library:Boundary.WebKit, name:"XInternAtom")
+let XSendEvent = C.function<func(uint, uint, int32, int, uint) int32>(library:Boundary.WebKit, name:"XSendEvent")
+let g_main_context_default = C.function<func() uint>(library:Boundary.WebKit, name:"g_main_context_default")
+let g_main_context_pending = C.function<func(uint) int32>(library:Boundary.WebKit, name:"g_main_context_pending")
+let g_main_context_iteration = C.function<func(uint, int32) int32>(library:Boundary.WebKit, name:"g_main_context_iteration")
+let g_free = C.function<func(uint) void>(library:Boundary.WebKit, name:"g_free")
+let g_object_unref = C.function<func(uint) void>(library:Boundary.WebKit, name:"g_object_unref")
+let g_signal_connect_data = C.function<func(uint, C.Pointer<uint8>, uint, uint, uint, int32) uint>(library:Boundary.WebKit, name:"g_signal_connect_data")
+let g_signal_handler_disconnect = C.function<func(uint, uint) void>(library:Boundary.WebKit, name:"g_signal_handler_disconnect")
+let webkit_user_content_manager_new = C.function<func() uint>(library:Boundary.WebKit, name:"webkit_user_content_manager_new")
+let webkit_user_content_manager_register_script_message_handler = C.function<func(uint, C.Pointer<uint8>) int32>(library:Boundary.WebKit, name:"webkit_user_content_manager_register_script_message_handler")
+let webkit_user_content_manager_unregister_script_message_handler = C.function<func(uint, C.Pointer<uint8>) void>(library:Boundary.WebKit, name:"webkit_user_content_manager_unregister_script_message_handler")
+let webkit_user_script_new = C.function<func(C.Pointer<uint8>, int32, int32, uint, uint) uint>(library:Boundary.WebKit, name:"webkit_user_script_new")
+let webkit_user_script_unref = C.function<func(uint) void>(library:Boundary.WebKit, name:"webkit_user_script_unref")
+let webkit_user_content_manager_add_script = C.function<func(uint, uint) void>(library:Boundary.WebKit, name:"webkit_user_content_manager_add_script")
+let webkit_web_view_new_with_user_content_manager = C.function<func(uint) uint>(library:Boundary.WebKit, name:"webkit_web_view_new_with_user_content_manager")
+let webkit_web_view_load_html = C.function<func(uint, C.Pointer<uint8>, uint) void>(library:Boundary.WebKit, name:"webkit_web_view_load_html")
+let webkit_web_view_is_loading = C.function<func(uint) int32>(library:Boundary.WebKit, name:"webkit_web_view_is_loading")
+let webkit_web_view_evaluate_javascript = C.function<func(uint, C.Pointer<uint8>, int, uint, uint, uint, uint, uint) void>(library:Boundary.WebKit, name:"webkit_web_view_evaluate_javascript")
+let webkit_web_view_set_background_color = C.function<func(uint, uint) void>(library:Boundary.WebKit, name:"webkit_web_view_set_background_color")
+let webkit_javascript_result_get_js_value = C.function<func(uint) uint>(library:Boundary.WebKit, name:"webkit_javascript_result_get_js_value")
+let jsc_value_to_string = C.function<func(uint) uint>(library:Boundary.WebKit, name:"jsc_value_to_string")

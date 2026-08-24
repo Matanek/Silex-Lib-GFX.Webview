@@ -95,9 +95,10 @@ References such as `<img src="/icon.png">` and `url("/icon.png")` are replaced
 with self-contained data URLs when the document is assembled. SVG may use
 either `embed_text` or `embed_bytes`; raster images and fonts use `embed_bytes`.
 
-The current macOS implementation assembles the entry HTML and its embedded
-resources into one self-contained document before loading it through WKWebView.
-The source directory is not distributed beside the executable.
+Each platform implementation assembles the entry HTML and its embedded
+resources into one self-contained document before loading it through the
+selected system WebView. The source directory is not distributed beside the
+executable.
 
 GFX.WebView installs `window.silex` at the native WebView's document-start phase,
 before any `<script>` from the entry HTML runs. Inline scripts may therefore
@@ -114,9 +115,11 @@ window.silex.on("status", payload => {
 `Asset.javascript` remains useful for separating application files, but it is
 not required to make the bridge available.
 
-`View` has no per-frame `update()` operation. WebKit owns layout, JavaScript,
-painting, and invalidation. The application only processes its ordinary GFX
-event loop.
+`View` has no public per-frame `update()` operation. WebKit owns layout,
+JavaScript, painting, and invalidation; `status`, `receive`, and `flush` perform
+the small amount of platform housekeeping needed by GTK and WebView2. The
+application continues to process its ordinary GFX event loop, and the plugin's
+`post_update` flush covers this automatically.
 
 ## Exchange application messages
 
@@ -198,18 +201,16 @@ native constraints.
 - `macos-arm64` is available. Its `Platform/MacOS` fragment calls the
   Objective-C runtime and the Cocoa/WebKit frameworks declared by this
   package's private `System` boundary.
-- Linux X64 has a complete selected-fragment contract and compiles with the
-  portable API, but reports itself unavailable. GTK 4 no longer supports
-  embedding a foreign native window, so the executable implementation must use
-  an embeddable WPE WebKit surface rather than opening a second GTK window.
-- Windows X64 and ARM64 have the same complete selected-fragment contract and
-  compile with the portable API, but report themselves unavailable. WebView2
-  requires the architecture-specific WebView2 loader in addition to the
-  installed runtime. The remaining implementation must resolve a
-  user-installed loader and provide asynchronous COM callbacks without placing
-  `WebView2Loader.dll` in this package.
+- `linux-x64` uses GTK 3, WebKitGTK 4.1 and X11. The GTK host is reparented into
+  the GFX window and its GLib events and bounds are updated from the ordinary
+  `View` operations. Native Wayland attachment is not yet implemented; XWayland
+  is supported through the same X11 path.
+- `windows-x64` and `windows-arm64` use the installed Microsoft Edge WebView2
+  Runtime. Their adapter implements the asynchronous COM handlers, bridge and
+  bounds in Silex; the package carries Microsoft's architecture-specific static
+  WebView2 loader, so it does not require a colocated `WebView2Loader.dll`.
 
-`GFX.WebView` itself contains no Objective-C, C or C++ source or native
-archive. Its macOS boundary names only system frameworks and the Objective-C
-runtime. The unavailable fragments deliberately fail before creating a second
-window or silently requiring an undeclared binary.
+`GFX.WebView` contains no Objective-C, C or C++ source. macOS and Linux bind
+their system facilities directly through Interop. Windows does the same for
+Win32 and COM and links only the official precompiled WebView2 static loader.
+The native browser engine remains supplied by the selected operating system.

@@ -1,11 +1,24 @@
-// Temporary target-complete adapter. It remains unavailable until Silex can
-// resolve a user-installed WebView2 loader and implement its asynchronous COM
-// callbacks without shipping WebView2Loader.dll in this package.
-func available() bool { return false }
+use Interop.C
+use Interop.Boundary
+
+// Private state (112 bytes): reference count; HWND; controller; CoreWebView2;
+// retained UTF-16 document and script; bridge context/callback; two event
+// tokens; message/navigation/loading/failure/visibility/destruction/COM flags.
+func state_size() C.Size { return 112 as C.Size }
+func handler_size() C.Size { return 48 as C.Size }
+
+func available() bool {
+    let result = allocate_zeroed(8)
+    if result == 0 as uint { return false }
+    let status = GetAvailableCoreWebView2BrowserVersionString(0 as uint, result)
+    let version = C.load<uint>(result, 0 as uint)
+    if version != 0 as uint { CoTaskMemFree(version) }
+    CoTaskMemFree(result)
+    return status >= 0
+}
 
 func unavailable_reason() str {
-    return "the Windows adapter requires WebView2Loader in addition to the installed WebView2 runtime; " +
-        "GFX.WebView does not distribute that architecture-specific third-party binary"
+    return "the Microsoft Edge WebView2 Runtime is not installed or cannot initialize on this Windows session"
 }
 
 func create(
@@ -15,51 +28,458 @@ func create(
     bridge_context:uint,
     bridge_callback:uint
 ) uint {
-    unavailable()
-    return 0 as uint
+    if window == 0 as uint || bridge_callback == 0 as uint { return 0 as uint }
+    let state = allocate_zeroed(state_size() as uint)
+    if state == 0 as uint { return 0 as uint }
+    C.store<int32>(state, 0 as uint, 1)
+    C.store<uint>(state, 8 as uint, window)
+    C.store<uint>(state, 48 as uint, bridge_context)
+    C.store<uint>(state, 56 as uint, bridge_callback)
+    C.store<int32>(state, 88 as uint, 1)
+    C.store<int32>(state, 96 as uint, 1)
+    let wide_document = utf8_to_wide(document)
+    let wide_script = utf8_to_wide(initialization_script)
+    C.store<uint>(state, 32 as uint, wide_document)
+    C.store<uint>(state, 40 as uint, wide_script)
+    if wide_document == 0 as uint || wide_script == 0 as uint {
+        state_release(state)
+        return 0 as uint
+    }
+    let initialized = CoInitializeEx(0 as uint, 2)
+    if initialized < 0 { state_release(state); return 0 as uint }
+    C.store<int32>(state, 104 as uint, 1)
+    let invoke:func(uint, int32, uint) int32 = environment_completed
+    let handler = make_handler(
+        state,
+        0x4bd2c9d84e8a3389 as uint,
+        0x4dc16cee4f12b5b6 as uint,
+        C.function_address(invoke)
+    )
+    if handler == 0 as uint { state_release(state); return 0 as uint }
+    let created = CreateCoreWebView2EnvironmentWithOptions(
+        0 as uint, 0 as uint, 0 as uint, handler
+    )
+    handler_release(handler)
+    if created < 0 { state_release(state); return 0 as uint }
+    return state
 }
 
-func bridge_script() str { return "window.__silexPost=message=>{};" }
+func bridge_script() str {
+    return "" +
+        "window.__silexPost=message=>window.chrome.webview.postMessage(message);" +
+        "window.chrome.webview.addEventListener('message',event=>window.__silexReceive(event.data));"
+}
 
-func send(view:uint, encoded_batch:str) bool { return false }
+func send(view:uint, encoded_batch:str) bool {
+    let web_view = field(view, 24)
+    if web_view == 0 as uint || flag(view, 88) || flag(view, 92) { return false }
+    let message = utf8_to_wide(encoded_batch)
+    if message == 0 as uint { return false }
+    let result = C.call<func(uint, uint) int32>(method(web_view, 32), web_view, message)
+    CoTaskMemFree(message)
+    return result >= 0
+}
 
-func message_context(handler:uint) uint { return 0 as uint }
-func message_text(message:uint) str { return "" }
+func message_context(handler:uint) uint { return handler }
+func message_text(message:uint) str { return copy_text(message) }
 
 func load(view:uint, document:str) bool {
-    unavailable()
-    return false
+    let web_view = field(view, 24)
+    if web_view == 0 as uint { return false }
+    let wide = utf8_to_wide(document)
+    if wide == 0 as uint { return false }
+    let previous = field(view, 32)
+    if previous != 0 as uint { CoTaskMemFree(previous) }
+    C.store<uint>(view, 32 as uint, wide)
+    C.store<int32>(view, 88 as uint, 1)
+    C.store<int32>(view, 92 as uint, 0)
+    let result = C.call<func(uint, uint) int32>(method(web_view, 6), web_view, wide)
+    if result < 0 { fail(view); return false }
+    return true
 }
 
 func set_visible(view:uint, visible:bool) {
-    unavailable()
+    if view == 0 as uint { return }
+    let native_visible = native_bool(visible)
+    C.store<int32>(view, 96 as uint, native_visible)
+    let controller = field(view, 16)
+    if controller != 0 as uint {
+        let result = C.call<func(uint, int32) int32>(
+            method(controller, 4), controller, native_visible
+        )
+    }
 }
 
 func is_visible(view:uint) bool {
-    unavailable()
-    return false
+    if view == 0 as uint { return false }
+    let controller = field(view, 16)
+    if controller != 0 as uint {
+        let storage = allocate_zeroed(4)
+        if storage != 0 as uint {
+            let result = C.call<func(uint, uint) int32>(method(controller, 3), controller, storage)
+            if result >= 0 { C.store<int32>(view, 96 as uint, C.load<int32>(storage, 0 as uint)) }
+            CoTaskMemFree(storage)
+        }
+    }
+    return flag(view, 96)
 }
 
 func loading(view:uint) bool {
-    unavailable()
-    return false
+    return view != 0 as uint && (flag(view, 88) || flag(view, 92))
 }
 
+func update(view:uint) { update_bounds(view) }
+
 func set_background(window:uint, view:uint, red:float, green:float, blue:float, alpha:float) {
-    unavailable()
+    let controller = field(view, 16)
+    if controller == 0 as uint { return }
+    let controller2 = query_interface(
+        controller, 0x4228d4cac979903e as uint, bits(0xab6ea93f, 0xee47eb92)
+    )
+    if controller2 == 0 as uint { return }
+    let color = channel(alpha) + (channel(red) << 8) +
+        (channel(green) << 16) + (channel(blue) << 24)
+    let result = C.call<func(uint, uint32) int32>(method(controller2, 27), controller2, color)
+    com_release(controller2)
 }
 
 func simulate_close_request(window:uint) {
-    unavailable()
+    if window != 0 as uint { let posted = PostMessageW(window, 16, 0 as uint, 0) }
 }
 
 func destroy(view:uint) {
-    if view != 0 as uint { unavailable() }
+    if view == 0 as uint || flag(view, 100) { return }
+    C.store<int32>(view, 100 as uint, 1)
+    let web_view = field(view, 24)
+    let controller = field(view, 16)
+    if web_view != 0 as uint && flag(view, 80) {
+        let removed = C.call<func(uint, uint) int32>(method(web_view, 35), web_view, field(view, 64))
+    }
+    if web_view != 0 as uint && flag(view, 84) {
+        let removed = C.call<func(uint, uint) int32>(method(web_view, 16), web_view, field(view, 72))
+    }
+    if controller != 0 as uint {
+        let closed = C.call<func(uint) int32>(method(controller, 24), controller)
+    }
+    if web_view != 0 as uint { com_release(web_view) }
+    if controller != 0 as uint { com_release(controller) }
+    C.store<uint>(view, 24 as uint, 0 as uint)
+    C.store<uint>(view, 16 as uint, 0 as uint)
+    state_release(view)
 }
 
-func unavailable() {
-    panic(
-        "GFX.WebView on Windows needs a system-resolved WebView2 loader and COM callback support; " +
-        "GFX.WebView will not hide WebView2Loader.dll in a package Boundary"
+func environment_completed(handler:uint, result:int32, environment:uint) int32 {
+    let state = field(handler, 16)
+    if state == 0 as uint || flag(state, 100) { return 0 }
+    if result < 0 || environment == 0 as uint { fail(state); return 0 }
+    let invoke:func(uint, int32, uint) int32 = controller_completed
+    let callback = make_handler(
+        state,
+        0x4260c9b76c4819f3 as uint,
+        bits(0x8cf6e7bd, 0xf5c92781),
+        C.function_address(invoke)
     )
+    if callback == 0 as uint { fail(state); return 0 }
+    let created = C.call<func(uint, uint, uint) int32>(
+        method(environment, 3), environment, field(state, 8), callback
+    )
+    handler_release(callback)
+    if created < 0 { fail(state) }
+    return 0
 }
+
+func controller_completed(handler:uint, result:int32, controller:uint) int32 {
+    let state = field(handler, 16)
+    if state == 0 as uint || flag(state, 100) { return 0 }
+    if result < 0 || controller == 0 as uint { fail(state); return 0 }
+    com_add_ref(controller)
+    C.store<uint>(state, 16 as uint, controller)
+    let output = allocate_zeroed(8)
+    if output == 0 as uint { fail(state); return 0 }
+    let got = C.call<func(uint, uint) int32>(method(controller, 25), controller, output)
+    let web_view = C.load<uint>(output, 0 as uint)
+    CoTaskMemFree(output)
+    if got < 0 || web_view == 0 as uint { fail(state); return 0 }
+    C.store<uint>(state, 24 as uint, web_view)
+    update_bounds(state)
+    set_visible(state, flag(state, 96))
+    let scripted = C.call<func(uint, uint, uint) int32>(
+        method(web_view, 27), web_view, field(state, 40), 0 as uint
+    )
+    if scripted < 0 { fail(state); return 0 }
+
+    let message_invoke:func(uint, uint, uint) int32 = message_received
+    let message_handler = make_handler(
+        state,
+        0x49fa00e657213f19 as uint,
+        bits(0xd2cb1ea0, 0x8e89078e),
+        C.function_address(message_invoke)
+    )
+    if message_handler == 0 as uint { fail(state); return 0 }
+    let message_added = C.call<func(uint, uint, uint) int32>(
+        method(web_view, 34), web_view, message_handler, state + 64
+    )
+    handler_release(message_handler)
+    if message_added < 0 { fail(state); return 0 }
+    C.store<int32>(state, 80 as uint, 1)
+
+    let navigation_invoke:func(uint, uint, uint) int32 = navigation_completed
+    let navigation_handler = make_handler(
+        state,
+        0x4f981c49d33a35bf as uint,
+        0x1cfe33056e00ab93 as uint,
+        C.function_address(navigation_invoke)
+    )
+    if navigation_handler == 0 as uint { fail(state); return 0 }
+    let navigation_added = C.call<func(uint, uint, uint) int32>(
+        method(web_view, 15), web_view, navigation_handler, state + 72
+    )
+    handler_release(navigation_handler)
+    if navigation_added < 0 { fail(state); return 0 }
+    C.store<int32>(state, 84 as uint, 1)
+    let navigated = C.call<func(uint, uint) int32>(method(web_view, 6), web_view, field(state, 32))
+    if navigated < 0 { fail(state) }
+    return 0
+}
+
+func navigation_completed(handler:uint, sender:uint, arguments:uint) int32 {
+    let state = field(handler, 16)
+    if state == 0 as uint || flag(state, 100) || arguments == 0 as uint { return 0 }
+    let success = allocate_zeroed(4)
+    if success == 0 as uint { fail(state); return 0 }
+    let result = C.call<func(uint, uint) int32>(method(arguments, 3), arguments, success)
+    let loaded = result >= 0 && C.load<int32>(success, 0 as uint) != 0
+    CoTaskMemFree(success)
+    C.store<int32>(state, 92 as uint, native_bool(!loaded))
+    C.store<int32>(state, 88 as uint, 0)
+    return 0
+}
+
+func message_received(handler:uint, sender:uint, arguments:uint) int32 {
+    let state = field(handler, 16)
+    if state == 0 as uint || flag(state, 100) || arguments == 0 as uint { return 0 }
+    let output = allocate_zeroed(8)
+    if output == 0 as uint { return 0 }
+    let result = C.call<func(uint, uint) int32>(method(arguments, 5), arguments, output)
+    let wide = C.load<uint>(output, 0 as uint)
+    CoTaskMemFree(output)
+    if result < 0 || wide == 0 as uint { return 0 }
+    let text = wide_to_utf8(wide)
+    CoTaskMemFree(wide)
+    if text == 0 as uint { return 0 }
+    let callback = field(state, 56)
+    if callback != 0 as uint {
+        C.call<func(uint, uint, uint, uint) void>(callback, field(state, 48), 0 as uint, 0 as uint, text)
+    }
+    CoTaskMemFree(text)
+    return 0
+}
+
+func update_bounds(state:uint) {
+    let controller = field(state, 16)
+    let window = field(state, 8)
+    if controller == 0 as uint || window == 0 as uint { return }
+    let rectangle = allocate_zeroed(16)
+    if rectangle == 0 as uint { return }
+    if GetClientRect(window, rectangle) != 0 {
+        let result = Target.put_bounds(method(controller, 6), controller, rectangle)
+    }
+    CoTaskMemFree(rectangle)
+}
+
+func make_handler(state:uint, iid_low:uint, iid_high:uint, invoke:uint) uint {
+    let object = allocate_zeroed(handler_size() as uint)
+    let vtable = allocate_zeroed(32)
+    if object == 0 as uint || vtable == 0 as uint {
+        if object != 0 as uint { CoTaskMemFree(object) }
+        if vtable != 0 as uint { CoTaskMemFree(vtable) }
+        return 0 as uint
+    }
+    let query:func(uint, uint, uint) int32 = handler_query_interface
+    let add:func(uint) uint32 = handler_add_ref
+    let release:func(uint) uint32 = handler_release
+    C.store<uint>(vtable, 0 as uint, C.function_address(query))
+    C.store<uint>(vtable, 8 as uint, C.function_address(add))
+    C.store<uint>(vtable, 16 as uint, C.function_address(release))
+    C.store<uint>(vtable, 24 as uint, invoke)
+    C.store<uint>(object, 0 as uint, vtable)
+    C.store<int32>(object, 8 as uint, 1)
+    C.store<uint>(object, 16 as uint, state)
+    C.store<uint>(object, 24 as uint, iid_low)
+    C.store<uint>(object, 32 as uint, iid_high)
+    state_add_ref(state)
+    return object
+}
+
+func handler_query_interface(object:uint, identifier:uint, output:uint) int32 {
+    if output == 0 as uint { return -2147467261 }
+    C.store<uint>(output, 0 as uint, 0 as uint)
+    if identifier == 0 as uint { return -2147467262 }
+    let low = C.load<uint>(identifier, 0 as uint)
+    let high = C.load<uint>(identifier, 8 as uint)
+    let expected = low == field(object, 24) && high == field(object, 32)
+    let unknown = low == 0 as uint && high == 0x46000000000000c0 as uint
+    if !expected && !unknown { return -2147467262 }
+    C.store<uint>(output, 0 as uint, object)
+    handler_add_ref(object)
+    return 0
+}
+
+func handler_add_ref(object:uint) uint32 {
+    return InterlockedIncrement(object + 8) as uint32
+}
+
+func handler_release(object:uint) uint32 {
+    let remaining = InterlockedDecrement(object + 8)
+    if remaining != 0 { return remaining as uint32 }
+    let state = field(object, 16)
+    let vtable = field(object, 0)
+    if vtable != 0 as uint { CoTaskMemFree(vtable) }
+    CoTaskMemFree(object)
+    state_release(state)
+    return 0
+}
+
+func state_add_ref(state:uint) { let count = InterlockedIncrement(state) }
+
+func state_release(state:uint) {
+    if state == 0 as uint || InterlockedDecrement(state) != 0 { return }
+    let document = field(state, 32)
+    let script = field(state, 40)
+    if document != 0 as uint { CoTaskMemFree(document) }
+    if script != 0 as uint { CoTaskMemFree(script) }
+    let uninitialize = flag(state, 104)
+    CoTaskMemFree(state)
+    if uninitialize { CoUninitialize() }
+}
+
+func query_interface(object:uint, low:uint, high:uint) uint {
+    let identifier = allocate_zeroed(16)
+    let output = allocate_zeroed(8)
+    if identifier == 0 as uint || output == 0 as uint {
+        if identifier != 0 as uint { CoTaskMemFree(identifier) }
+        if output != 0 as uint { CoTaskMemFree(output) }
+        return 0 as uint
+    }
+    C.store<uint>(identifier, 0 as uint, low)
+    C.store<uint>(identifier, 8 as uint, high)
+    let result = C.call<func(uint, uint, uint) int32>(method(object, 0), object, identifier, output)
+    var resolved = 0 as uint
+    if result >= 0 { resolved = C.load<uint>(output, 0 as uint) }
+    CoTaskMemFree(identifier)
+    CoTaskMemFree(output)
+    return resolved
+}
+
+func com_add_ref(object:uint) uint32 {
+    return C.call<func(uint) uint32>(method(object, 1), object)
+}
+
+func com_release(object:uint) uint32 {
+    return C.call<func(uint) uint32>(method(object, 2), object)
+}
+
+func method(object:uint, index:uint) uint {
+    if object == 0 as uint { return 0 as uint }
+    let vtable = C.load<uint>(object, 0 as uint)
+    if vtable == 0 as uint { return 0 as uint }
+    return C.load<uint>(vtable, index * 8)
+}
+
+func field(address:uint, offset:uint) uint {
+    if address == 0 as uint { return 0 as uint }
+    return C.load<uint>(address, offset)
+}
+
+func flag(address:uint, offset:uint) bool {
+    return address != 0 as uint && C.load<int32>(address, offset) != 0
+}
+
+func fail(state:uint) {
+    C.store<int32>(state, 92 as uint, 1)
+    C.store<int32>(state, 88 as uint, 0)
+}
+
+func allocate(size:uint) uint {
+    return C.address_bits(CoTaskMemAlloc(size as C.Size))
+}
+
+func allocate_zeroed(size:uint) uint {
+    let address = allocate(size)
+    if address == 0 as uint { return 0 as uint }
+    var offset = 0 as uint
+    while offset < size {
+        C.store<uint8>(address, offset, 0)
+        offset++
+    }
+    return address
+}
+
+func utf8_to_wide(text:str) uint {
+    let count = MultiByteToWideChar(
+        65001, 8, C.address_bits(C.terminated_pointer(text)), -1, 0 as uint, 0
+    )
+    if count <= 0 { return 0 as uint }
+    let result = allocate((count as uint) * 2)
+    if result == 0 as uint { return 0 as uint }
+    if MultiByteToWideChar(
+        65001, 8, C.address_bits(C.terminated_pointer(text)), -1, result, count
+    ) == 0 {
+        CoTaskMemFree(result)
+        return 0 as uint
+    }
+    return result
+}
+
+func wide_to_utf8(wide:uint) uint {
+    let count = WideCharToMultiByte(65001, 128, wide, -1, 0 as uint, 0, 0 as uint, 0 as uint)
+    if count <= 0 { return 0 as uint }
+    let result = allocate(count as uint)
+    if result == 0 as uint { return 0 as uint }
+    if WideCharToMultiByte(65001, 128, wide, -1, result, count, 0 as uint, 0 as uint) == 0 {
+        CoTaskMemFree(result)
+        return 0 as uint
+    }
+    return result
+}
+
+func copy_text(address:uint) str {
+    if address == 0 as uint { return "" }
+    var bytes:uint8[] = []
+    var index = 0
+    while index < 16777216 {
+        let byte = C.load<uint8>(address, index as uint)
+        if byte == 0 { return C.string(@bytes[0:bytes.count()]) }
+        bytes.append(byte)
+        index++
+    }
+    return ""
+}
+
+func channel(value:float) uint32 {
+    if value <= 0.0 { return 0 }
+    if value >= 1.0 { return 255 }
+    return (value * 255.0) as uint32
+}
+
+func native_bool(value:bool) int32 {
+    if value { return 1 }
+    return 0
+}
+
+func bits(high:uint, low:uint) uint {
+    return (high << 32) + low
+}
+
+let GetAvailableCoreWebView2BrowserVersionString = C.function<func(uint, uint) int32>(library:Boundary.WebView2, name:"GetAvailableCoreWebView2BrowserVersionString")
+let CreateCoreWebView2EnvironmentWithOptions = C.function<func(uint, uint, uint, uint) int32>(library:Boundary.WebView2, name:"CreateCoreWebView2EnvironmentWithOptions")
+let CoInitializeEx = C.function<func(uint, uint32) int32>(library:Boundary.WebView2, name:"CoInitializeEx")
+let CoUninitialize = C.function<func() void>(library:Boundary.WebView2, name:"CoUninitialize")
+let CoTaskMemAlloc = C.function<func(C.Size) C.Pointer<uint8> >(library:Boundary.WebView2, name:"CoTaskMemAlloc")
+let CoTaskMemFree = C.function<func(uint) void>(library:Boundary.WebView2, name:"CoTaskMemFree")
+let InterlockedIncrement = C.function<func(uint) int32>(library:Boundary.WebView2, name:"InterlockedIncrement")
+let InterlockedDecrement = C.function<func(uint) int32>(library:Boundary.WebView2, name:"InterlockedDecrement")
+let MultiByteToWideChar = C.function<func(uint32, uint32, uint, int32, uint, int32) int32>(library:Boundary.WebView2, name:"MultiByteToWideChar")
+let WideCharToMultiByte = C.function<func(uint32, uint32, uint, int32, uint, int32, uint, uint) int32>(library:Boundary.WebView2, name:"WideCharToMultiByte")
+let GetClientRect = C.function<func(uint, uint) int32>(library:Boundary.WebView2, name:"GetClientRect")
+let PostMessageW = C.function<func(uint, uint32, uint, int) int32>(library:Boundary.WebView2, name:"PostMessageW")

@@ -17,6 +17,38 @@
           "libraries": ["objc"]
         }
       }
+    },
+    "linux-x64": {
+      "providers": {
+        "WebKit": {
+          "libraries": [
+            "webkit2gtk-4.1",
+            "javascriptcoregtk-4.1",
+            "gtk-3",
+            "gdk-3",
+            "gobject-2.0",
+            "glib-2.0",
+            "X11",
+            "c"
+          ]
+        }
+      }
+    },
+    "windows-x64": {
+      "providers": {
+        "WebView2": {
+          "archive": "Boundary/windows-x64/WebView2LoaderStatic.lib",
+          "libraries": ["advapi32", "kernel32", "ole32", "shell32", "shlwapi", "user32", "version"]
+        }
+      }
+    },
+    "windows-arm64": {
+      "providers": {
+        "WebView2": {
+          "archive": "Boundary/windows-arm64/WebView2LoaderStatic.lib",
+          "libraries": ["advapi32", "kernel32", "ole32", "shell32", "shlwapi", "user32", "version"]
+        }
+      }
     }
   }
 }

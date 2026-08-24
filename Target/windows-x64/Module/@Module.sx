@@ -1,0 +1,6 @@
+use Interop.C
+
+func put_bounds(method:uint, controller:uint, rectangle:uint) int32 {
+    // The Microsoft x64 ABI passes a 16-byte RECT by reference.
+    return C.call<func(uint, uint) int32>(method, controller, rectangle)
+}

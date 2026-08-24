@@ -23,8 +23,8 @@ func main() {
 ```
 
 The package owns its portable WebView API, application plugin, platform
-adapters, examples, tests and system-framework boundary. It depends only on
-public GFX capabilities and contributes its plugin and resource views to
+adapters, examples, tests and target-selected system boundary. It depends only
+on public GFX capabilities and contributes its plugin and resource views to
 `GFX.Plugins` and `GFX.Resources`.
 
 `Tests/Consumer` is an anonymous application fixture with its own manifest. It

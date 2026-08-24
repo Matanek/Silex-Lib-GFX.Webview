@@ -85,6 +85,8 @@ func loading(view:uint) bool {
     return bool_message(view, "isLoading")
 }
 
+func update(view:uint) {}
+
 func set_background(window:uint, view:uint, red:float, green:float, blue:float, alpha:float) {
     let pool = object_message(system_class("NSAutoreleasePool"), "new")
     let color = color_message(
