@@ -5,7 +5,7 @@
   "authors": ["Matanek"],
   "requires": { "silex": ">=0.40.0" },
   "dependencies": {
-    "GFX": "^0.38.1",
+    "GFX": "^0.38.2",
     "JSON": "^0.1.0",
     "STD": "^0.16.0"
   },
