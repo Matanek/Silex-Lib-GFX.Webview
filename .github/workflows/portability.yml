@@ -151,8 +151,12 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
+          $env:USERPROFILE = Join-Path $env:RUNNER_TEMP "home-arm64"
+          $env:HOME = $env:USERPROFILE
+          New-Item -ItemType Directory -Force $env:USERPROFILE | Out-Null
           $silex = Join-Path $env:RUNNER_TEMP "silex-prefix/bin/silex.exe"
-          & $silex install STD --target windows-arm64
+          & $silex setup
+          & $silex link (Join-Path $env:GITHUB_WORKSPACE "STD") --target windows-arm64
           & $silex install JSON --target windows-arm64
           & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX") --target windows-arm64
           & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView") --target windows-arm64
