@@ -291,7 +291,9 @@ public class View {
     private let document_value:str
 
     init(window:@Window, site:Site, settings:Settings = Settings()) {
+        print("GFX_WEBVIEW_CHECKPOINT constructor-entered")
         let availability = availability()
+        print("GFX_WEBVIEW_CHECKPOINT availability-ready")
         if !availability.is_available() {
             if let reason = availability.reason() { panic("GFX.WebView is unavailable: " + reason) }
             panic("GFX.WebView is unavailable on this platform")
@@ -303,6 +305,7 @@ public class View {
         var bridge = Bridge()
         let callback:func(uint, uint, uint, uint) void = receive_bridge_message
         let document_value = document(site, settings)
+        print("GFX_WEBVIEW_CHECKPOINT document-built")
         let handle = Platform.create(
             platform_window,
             document_value,
@@ -310,6 +313,7 @@ public class View {
             C.object_address(bridge),
             C.function_address(callback)
         )
+        print("GFX_WEBVIEW_CHECKPOINT platform-created")
         if handle == 0 as uint {
             panic("GFX.WebView could not create the system WebView")
         }

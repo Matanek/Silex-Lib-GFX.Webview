@@ -1,9 +1,13 @@
 use GFX.WebView
 
 test "embed WebView assets and resolve logical paths" {
+    print("GFX_WEBVIEW_ASSETS entry")
     var site = WebView.Site.html(embed_text("Fixtures/index.html"))
+    print("GFX_WEBVIEW_ASSETS html")
     site.add(WebView.Asset.css(embed_text("Fixtures/app.css"), path:"/app.css"))
+    print("GFX_WEBVIEW_ASSETS css")
     site.add(WebView.Asset.javascript(embed_text("Fixtures/app.js")))
+    print("GFX_WEBVIEW_ASSETS javascript")
 
     assert(site.entry().path() == "/index.html")
     assert(site.entry().media_type() == WebView.MediaType.html)
@@ -15,6 +19,7 @@ test "embed WebView assets and resolve logical paths" {
     assert(WebView.media_type_text(WebView.MediaType.custom("model/gltf-binary")) == "model/gltf-binary")
     assert(site.find("/missing") == null)
     assert(site.count() == 3)
+    print("GFX_WEBVIEW_ASSETS text-verified")
     var binary_site = WebView.Site.html("<img src=\"/pixel.png\">")
     binary_site.add(WebView.Asset(
         content:embed_bytes("Fixtures/app.js"),
@@ -22,4 +27,5 @@ test "embed WebView assets and resolve logical paths" {
         media_type:WebView.MediaType.png,
     ))
     assert(binary_site.require("/pixel.png").media_type() == WebView.MediaType.png)
+    print("GFX_WEBVIEW_ASSETS binary-verified")
 }

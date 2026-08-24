@@ -26,6 +26,13 @@ jobs:
           repository: Matanek/Silex
           path: _silex
 
+      - name: Check out the exact STD checkpoint
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-STD
+          ref: 7e1b028f8d899f1d6730c4f56ba225b89bc2d8d0
+          path: STD
+
       - name: Install WebKitGTK and Zig
         shell: bash
         run: |
@@ -56,6 +63,7 @@ jobs:
           "$silex" install STD
           "$silex" install JSON
           "$silex" install GFX
+          "$silex" link "$GITHUB_WORKSPACE/STD"
           xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEODRIVER=x11 \
             NO_AT_BRIDGE=1 LIBGL_ALWAYS_SOFTWARE=1 \
             WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 \
@@ -76,6 +84,13 @@ jobs:
         with:
           repository: Matanek/Silex
           path: _silex
+
+      - name: Check out the exact STD checkpoint
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-STD
+          ref: 7e1b028f8d899f1d6730c4f56ba225b89bc2d8d0
+          path: STD
 
       - name: Install Zig
         shell: pwsh
@@ -111,6 +126,7 @@ jobs:
           & $silex install STD
           & $silex install JSON
           & $silex install GFX
+          & $silex link (Join-Path $env:GITHUB_WORKSPACE "STD")
           & $silex test (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests")
 
       - name: Cross-compile the Windows ARM64 fragment
