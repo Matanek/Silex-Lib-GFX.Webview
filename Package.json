@@ -1,9 +1,9 @@
 {
   "name": "GFX.WebView",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Embed system HTML, CSS, and JavaScript WebViews in GFX windows.",
   "authors": ["Matanek"],
-  "requires": { "silex": ">=0.39.0" },
+  "requires": { "silex": ">=0.40.0" },
   "dependencies": {
     "GFX": "^0.37.0",
     "JSON": "^0.1.0",
