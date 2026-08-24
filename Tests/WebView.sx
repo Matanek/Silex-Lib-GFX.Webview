@@ -25,7 +25,7 @@ test "attach a system WebView to a GFX window" {
         input.update()
         ready_attempts++
     }
-    print("GFX_WEBVIEW_CHECKPOINT document-state attempts=$(ready_attempts) visible=$(view.is_visible()) loading=$(view.status() == WebView.Status.loading) ready=$(view.status() == WebView.Status.ready)")
+    print("GFX_WEBVIEW_CHECKPOINT document-state attempts=$(ready_attempts) visible=$(view.is_visible()) loading=$(view.status() == WebView.Status.loading) ready=$(view.status() == WebView.Status.ready) failed=$(view.native_failed()) failure_code=$(view.native_failure_code())")
     assert(view.is_visible())
     assert(view.status() == WebView.Status.ready)
     print("GFX_WEBVIEW_CHECKPOINT document-ready")

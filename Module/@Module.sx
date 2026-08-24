@@ -356,6 +356,9 @@ public class View {
         return Status.ready
     }
 
+    package func native_failed() bool { return Platform.failed(self.handle) }
+    package func native_failure_code() int32 { return Platform.failure_code(self.handle) }
+
     func send(name:str, payload:str = "") {
         self.bridge.queue(Message(name:name, payload:payload))
     }

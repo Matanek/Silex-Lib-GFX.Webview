@@ -85,6 +85,9 @@ func loading(view:uint) bool {
     return bool_message(view, "isLoading")
 }
 
+func failed(view:uint) bool { return false }
+func failure_code(view:uint) int32 { return 0 }
+
 func update(view:uint) {}
 
 func set_background(window:uint, view:uint, red:float, green:float, blue:float, alpha:float) {

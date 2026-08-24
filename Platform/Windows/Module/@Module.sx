@@ -129,6 +129,13 @@ func loading(view:uint) bool {
     return view != 0 as uint && (flag(view, 88) || flag(view, 92))
 }
 
+func failed(view:uint) bool { return flag(view, 92) }
+
+func failure_code(view:uint) int32 {
+    if view == 0 as uint { return -1 }
+    return C.load<int32>(view, 108 as uint)
+}
+
 func update(view:uint) {
     pump_messages(view)
     update_bounds(view)
@@ -254,6 +261,12 @@ func navigation_completed(handler:uint, sender:uint, arguments:uint) int32 {
     let result = C.call<func(uint, uint) int32>(method(arguments, 3), arguments, success)
     let loaded = result >= 0 && C.load<int32>(success, 0 as uint) != 0
     CoTaskMemFree(success)
+    if loaded {
+        C.store<int32>(state, 108 as uint, 0)
+    } else {
+        let error_result = C.call<func(uint, uint) int32>(method(arguments, 4), arguments, state + 108)
+        if error_result < 0 { C.store<int32>(state, 108 as uint, -1) }
+    }
     C.store<int32>(state, 92 as uint, native_bool(!loaded))
     C.store<int32>(state, 88 as uint, 0)
     return 0
@@ -411,6 +424,7 @@ func flag(address:uint, offset:uint) bool {
 }
 
 func fail(state:uint) {
+    C.store<int32>(state, 108 as uint, -1)
     C.store<int32>(state, 92 as uint, 1)
     C.store<int32>(state, 88 as uint, 0)
 }

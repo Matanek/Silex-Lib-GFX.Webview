@@ -132,6 +132,9 @@ func loading(view:uint) bool {
     return web_view != 0 as uint && webkit_web_view_is_loading(web_view) != 0
 }
 
+func failed(view:uint) bool { return false }
+func failure_code(view:uint) int32 { return 0 }
+
 func update(view:uint) {
     pump_events()
     resize(view)
