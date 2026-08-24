@@ -38,7 +38,7 @@ func create(
     C.store<uint>(state, 56 as uint, bridge_callback)
     C.store<int32>(state, 88 as uint, 1)
     C.store<int32>(state, 96 as uint, 1)
-    let wide_document = utf8_to_wide(document)
+    let wide_document = utf8_to_wide(ready_document(document))
     let wide_script = utf8_to_wide(initialization_script)
     C.store<uint>(state, 32 as uint, wide_document)
     C.store<uint>(state, 40 as uint, wide_script)
@@ -71,6 +71,13 @@ func bridge_script() str {
         "window.chrome.webview.addEventListener('message',event=>window.__silexReceive(event.data));"
 }
 
+func ready_document(document:str) str {
+    return document +
+        "\n<script>window.chrome.webview.postMessage('__silex_webview_document_ready__');</script>\n"
+}
+
+func ready_message() str { return "__silex_webview_document_ready__" }
+
 func send(view:uint, encoded_batch:str) bool {
     let web_view = field(view, 24)
     if web_view == 0 as uint || flag(view, 88) || flag(view, 92) { return false }
@@ -87,7 +94,7 @@ func message_text(message:uint) str { return copy_text(message) }
 func load(view:uint, document:str) bool {
     let web_view = field(view, 24)
     if web_view == 0 as uint { return false }
-    let wide = utf8_to_wide(document)
+    let wide = utf8_to_wide(ready_document(document))
     if wide == 0 as uint { return false }
     let previous = field(view, 32)
     if previous != 0 as uint { CoTaskMemFree(previous) }
@@ -284,6 +291,13 @@ func message_received(handler:uint, sender:uint, arguments:uint) int32 {
     let text = wide_to_utf8(wide)
     CoTaskMemFree(wide)
     if text == 0 as uint { return 0 }
+    if copy_text(text) == ready_message() {
+        C.store<int32>(state, 108 as uint, 0)
+        C.store<int32>(state, 92 as uint, 0)
+        C.store<int32>(state, 88 as uint, 0)
+        CoTaskMemFree(text)
+        return 0
+    }
     let callback = field(state, 56)
     if callback != 0 as uint {
         C.call<func(uint, uint, uint, uint) void>(callback, field(state, 48), 0 as uint, 0 as uint, text)
