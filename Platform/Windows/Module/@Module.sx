@@ -3,8 +3,9 @@ use Interop.Boundary
 
 // Private state (112 bytes): reference count; HWND; controller; CoreWebView2;
 // retained UTF-16 document and script; bridge context/callback; two event
-// tokens; message/navigation/loading/failure/visibility/destruction/COM flags.
-func state_size() C.Size { return 112 as C.Size }
+// tokens; message/navigation/loading/failure/visibility/destruction/COM flags;
+// and reusable Win32 MSG storage.
+func state_size() C.Size { return 160 as C.Size }
 func handler_size() C.Size { return 48 as C.Size }
 
 func available() bool {
@@ -128,7 +129,10 @@ func loading(view:uint) bool {
     return view != 0 as uint && (flag(view, 88) || flag(view, 92))
 }
 
-func update(view:uint) { update_bounds(view) }
+func update(view:uint) {
+    pump_messages(view)
+    update_bounds(view)
+}
 
 func set_background(window:uint, view:uint, red:float, green:float, blue:float, alpha:float) {
     let controller = field(view, 16)
@@ -285,6 +289,17 @@ func update_bounds(state:uint) {
         let result = Target.put_bounds(method(controller, 6), controller, rectangle)
     }
     CoTaskMemFree(rectangle)
+}
+
+func pump_messages(state:uint) {
+    if state == 0 as uint { return }
+    let message = state + 112
+    var processed = 0
+    while processed < 64 && PeekMessageW(message, 0 as uint, 0, 0, 1) != 0 {
+        let translated = TranslateMessage(message)
+        let dispatched = DispatchMessageW(message)
+        processed++
+    }
 }
 
 func make_handler(state:uint, iid_low:uint, iid_high:uint, invoke:uint) uint {
@@ -482,4 +497,7 @@ let InterlockedDecrement = C.function<func(uint) int32>(library:Boundary.WebView
 let MultiByteToWideChar = C.function<func(uint32, uint32, uint, int32, uint, int32) int32>(library:Boundary.WebView2, name:"MultiByteToWideChar")
 let WideCharToMultiByte = C.function<func(uint32, uint32, uint, int32, uint, int32, uint, uint) int32>(library:Boundary.WebView2, name:"WideCharToMultiByte")
 let GetClientRect = C.function<func(uint, uint) int32>(library:Boundary.WebView2, name:"GetClientRect")
+let PeekMessageW = C.function<func(uint, uint, uint32, uint32, uint32) int32>(library:Boundary.WebView2, name:"PeekMessageW")
+let TranslateMessage = C.function<func(uint) int32>(library:Boundary.WebView2, name:"TranslateMessage")
+let DispatchMessageW = C.function<func(uint) int>(library:Boundary.WebView2, name:"DispatchMessageW")
 let PostMessageW = C.function<func(uint, uint32, uint, int) int32>(library:Boundary.WebView2, name:"PostMessageW")
