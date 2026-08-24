@@ -4,17 +4,22 @@ test "embed WebView assets and resolve logical paths" {
     var site = WebView.Site.html(embed_text("Fixtures/index.html"))
     site.add(WebView.Asset.css(embed_text("Fixtures/app.css"), path:"/app.css"))
     site.add(WebView.Asset.javascript(embed_text("Fixtures/app.js")))
+    print("GFX_WEBVIEW_ASSETS_CHECKPOINT site-ready")
 
     assert(site.entry().path() == "/index.html")
     assert(site.entry().media_type() == WebView.MediaType.html)
     assert(site.entry().media_type_text() == "text/html; charset=utf-8")
+    print("GFX_WEBVIEW_ASSETS_CHECKPOINT entry-ready")
     assert(site.require("/app.css").text() == "main { color: #7c3aed; }\n")
     assert(site.require("/app.js").media_type() == WebView.MediaType.javascript)
+    print("GFX_WEBVIEW_ASSETS_CHECKPOINT required-assets-ready")
     assert(WebView.media_type_text(WebView.MediaType.svg) == "image/svg+xml")
     assert(WebView.media_type_text(WebView.MediaType.jpeg) == "image/jpeg")
     assert(WebView.media_type_text(WebView.MediaType.custom("model/gltf-binary")) == "model/gltf-binary")
+    print("GFX_WEBVIEW_ASSETS_CHECKPOINT media-types-ready")
     assert(site.find("/missing") == null)
     assert(site.count() == 3)
+    print("GFX_WEBVIEW_ASSETS_CHECKPOINT catalog-ready")
     var binary_site = WebView.Site.html("<img src=\"/pixel.png\">")
     binary_site.add(WebView.Asset(
         content:embed_bytes("Fixtures/app.js"),
@@ -22,4 +27,5 @@ test "embed WebView assets and resolve logical paths" {
         media_type:WebView.MediaType.png,
     ))
     assert(binary_site.require("/pixel.png").media_type() == WebView.MediaType.png)
+    print("GFX_WEBVIEW_ASSETS_CHECKPOINT binary-ready")
 }
