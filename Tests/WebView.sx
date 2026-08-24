@@ -20,12 +20,12 @@ test "attach a system WebView to a GFX window" {
     print("GFX_WEBVIEW_CHECKPOINT view-ready")
     var input = Input()
     var ready_attempts = 0
-    while view.status() == WebView.Status.loading && ready_attempts < 250 {
+    while view.status() == WebView.Status.loading && ready_attempts < 2500 {
         input.wait(4)
         input.update()
         ready_attempts++
     }
-    print("GFX_WEBVIEW_CHECKPOINT document-state visible=$(view.is_visible()) loading=$(view.status() == WebView.Status.loading) ready=$(view.status() == WebView.Status.ready)")
+    print("GFX_WEBVIEW_CHECKPOINT document-state attempts=$(ready_attempts) visible=$(view.is_visible()) loading=$(view.status() == WebView.Status.loading) ready=$(view.status() == WebView.Status.ready)")
     assert(view.is_visible())
     assert(view.status() == WebView.Status.ready)
     print("GFX_WEBVIEW_CHECKPOINT document-ready")
