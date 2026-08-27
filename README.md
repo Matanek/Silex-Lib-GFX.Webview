@@ -23,9 +23,12 @@ func main() {
 ```
 
 The package owns its portable WebView API, application plugin, platform
-adapters, examples, tests and target-selected system boundary. It depends only
-on public GFX capabilities and contributes its plugin and resource views to
-`GFX.Plugins` and `GFX.Resources`.
+adapters, tests and target-selected system boundary. The
+complete [embedded-files application](https://github.com/Matanek/Silex-Examples/tree/main/Sources/EmbeddedWebView)
+lives in `Silex-Examples`, together with the bidirectional
+[`WebViewBridge.sx`](https://github.com/Matanek/Silex-Examples/blob/main/Sources/WebViewBridge.sx)
+application. The package depends only on public GFX capabilities and
+contributes its plugin and resource views to `GFX.Plugins` and `GFX.Resources`.
 
 `Tests/Consumer` is an anonymous application fixture with its own manifest. It
 verifies those declarations from outside the package with no privileged access.
