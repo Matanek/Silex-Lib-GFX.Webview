@@ -158,9 +158,11 @@ side waits synchronously for the other, and the bridge does not participate in
 rendering frames.
 
 The functional smoke sends 256 round trips through the public bridge.
-`Benchmarks/WebViewBridge.sx` runs the same path with 1,000 messages so an
-external profiler or command timer can inspect batching without embedding a
-machine-dependent timing threshold in the package.
+The centralized
+[WebViewBridgeRoundTrips](https://github.com/Matanek/Silex-Benchmarks/tree/main/Sources/WebViewBridgeRoundTrips)
+benchmark runs the same path with 1,000 messages so an external profiler or
+command timer can inspect batching without embedding a machine-dependent timing
+threshold in the package.
 
 Without `GFX.Application`, handle the close request belonging to the window:
 
