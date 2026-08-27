@@ -1,0 +1,6 @@
+use GFX.WebView
+
+func main() {
+    let current = WebView.availability()
+    print("WebView available: $(current.is_available())")
+}

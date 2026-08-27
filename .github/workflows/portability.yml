@@ -24,8 +24,8 @@ concurrency:
 
 env:
   SILEX_CHECKPOINT: e3d08900398f85e2552825a9c60f5e85a7f1e459
-  STD_CHECKPOINT: b0df2f8e0d335d0ebac4908e9287c19530e97997
-  GFX_CHECKPOINT: 7713785811cf1a78869f3f604ef03b6105852197
+  STD_CHECKPOINT: 8ef3245e78af54ac7325a9de0765dd27109d6dce
+  GFX_CHECKPOINT: 608b94bbefaf25581b4e1b125bdc45e21cc9edc1
 
 jobs:
   linux-x64:
@@ -186,6 +186,6 @@ jobs:
           & $silex install JSON --target windows-arm64
           & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX") --target windows-arm64
           & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView") --target windows-arm64
-          & $silex compile (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Examples/BridgeWebPage.sx") `
+          & $silex compile (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests/Fixtures/WindowsArm64Compile.sx") `
             --target windows-arm64 `
             -o (Join-Path $env:RUNNER_TEMP "webview-arm64.exe")
