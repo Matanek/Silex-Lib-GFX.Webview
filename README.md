@@ -1,37 +1,15 @@
 # GFX.WebView
 
-GFX.WebView displays embedded HTML, CSS and JavaScript inside a system WebView
-attached to a `GFX.Window`. It uses the operating-system browser engine and
-does not distribute Chromium or another browser runtime.
+`GFX.WebView` embeds HTML, CSS, and JavaScript interfaces in GFX windows using
+the browser engine supplied by the operating system.
 
 ```text
 silex install GFX.WebView
 ```
 
-```sx
-use GFX.Application
-use GFX.WebView
+## Documentation
 
-func main() {
-    let site = WebView.Site.html(
-        "<!doctype html><html><body><h1>Silex</h1></body></html>"
-    )
-    Application()
-        ..add_plugin(WebView.Plugin(site))
-        ..run()
-}
-```
+- [Documentation française](Docs/FR/README.md)
+- [English documentation](Docs/EN/README.md)
 
-The package owns its portable WebView API, application plugin, platform
-adapters, tests and target-selected system boundary. The
-complete [embedded-files application](https://github.com/Matanek/Silex-Examples/tree/main/Sources/EmbeddedWebView)
-lives in `Silex-Examples`, together with the bidirectional
-[`WebViewBridge.sx`](https://github.com/Matanek/Silex-Examples/blob/main/Sources/WebViewBridge.sx)
-application. The package depends only on public GFX capabilities and
-contributes its plugin and resource views to `GFX.Plugins` and `GFX.Resources`.
-
-`Tests/Consumer` is an anonymous application fixture with its own manifest. It
-verifies those declarations from outside the package with no privileged access.
-
-See [Docs/README.md](Docs/README.md) for assets, messaging, lifecycle and
-platform availability.
+The package requires Silex 0.40.0 or newer.
