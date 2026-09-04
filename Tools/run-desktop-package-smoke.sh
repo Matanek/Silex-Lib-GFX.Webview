@@ -22,6 +22,9 @@ temporary_dir="${12}"
 integrated_consumer="$webview_dir/Tests/Portability"
 
 mkdir -p "$temporary_dir"
+# GFX.Font's public consumer intentionally verifies a relative workspace path.
+# Recreate only its scratch parent when the CI checkouts are laid out flat.
+mkdir -p "$(pwd)/Packages/GFX.Font/Tests/Consumer/Tests"
 
 link_into() {
     local workspace="$1"
