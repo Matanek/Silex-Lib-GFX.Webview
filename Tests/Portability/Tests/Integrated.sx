@@ -15,13 +15,15 @@ func required_face(result:Result<VectorFont.Face, VectorFont.Error>) VectorFont.
     }
 }
 
-test "compose the official native desktop packages through public APIs" {
+test "compose GFX.Audio through its public API" {
     let playback = GFXAudio.Playback(
         volume:0.5,
         repeat:GFXAudio.Repeat.times(2)
     )
     assert(playback.volume == 0.5)
+}
 
+test "compose GFX.Canvas and GFX.Font through their public APIs" {
     var font = Canvas.Font(required_face(VectorFont.Face.default()))
     var drawing = Canvas()
     drawing.paint(func(painter:&Canvas.Painter) {
@@ -34,13 +36,17 @@ test "compose the official native desktop packages through public APIs" {
     let raster = drawing.rasterize(48, 20)
     assert(raster.width() == 48)
     assert(raster.height() == 20)
+}
 
+test "compose Image codecs through their public APIs" {
     var bitmap = Image.canvas(2, 2, Image.Color(120, 80, 40))
     let jpeg = Image.encode(bitmap, JPEG.Options(quality:90))
     let webp = Image.encode(bitmap, WebP.Options(lossless:true))
     assert(Image.decode(jpeg).width() == 2)
     assert(Image.decode(webp).height() == 2)
+}
 
+test "compose GFX.WebView through its public plugin API" {
     let site = WebView.Site.html("<!doctype html><html></html>")
     let plugin = Plugins.WebView(site)
     assert(plugin.id() == "GFX.WebView.Plugin")
