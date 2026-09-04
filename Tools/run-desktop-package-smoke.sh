@@ -78,7 +78,7 @@ else
     webview_output="$("$silex" test "$webview_dir/Tests" --nocache)"
 fi
 printf '%s\n' "$webview_output"
-grep -Fxq '5 passed; 0 failed in 4 files' <<< "$webview_output"
+grep -Fxq '6 passed; 0 failed in 5 files' <<< "$webview_output"
 
 if [[ "$target" == macos-arm64 ]]; then
     link_into "$audio_dir" "$std_dir" "$gfx_dir"
