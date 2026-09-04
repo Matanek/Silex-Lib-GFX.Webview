@@ -1,0 +1,14 @@
+{
+  "sources": "Tests",
+  "dependencies": {
+    "GFX": "^0.39.1",
+    "GFX.Assets": "^0.2.2",
+    "GFX.Audio": "^0.3.1",
+    "GFX.Canvas": "^0.3.1",
+    "GFX.Font": "^0.1.0",
+    "GFX.WebView": "^0.4.1",
+    "Image": "^0.1.1",
+    "JSON": "^0.1.0",
+    "STD": "^0.21.0"
+  }
+}

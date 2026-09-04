@@ -21,6 +21,30 @@
         }
       }
     },
+    "macos-x64": {
+      "providers": {
+        "System": {
+          "frameworks": ["Cocoa", "WebKit"],
+          "libraries": ["objc"]
+        }
+      }
+    },
+    "linux-arm64": {
+      "providers": {
+        "WebKit": {
+          "libraries": [
+            "webkit2gtk-4.1",
+            "javascriptcoregtk-4.1",
+            "gtk-3",
+            "gdk-3",
+            "gobject-2.0",
+            "glib-2.0",
+            "X11",
+            "c"
+          ]
+        }
+      }
+    },
     "linux-x64": {
       "providers": {
         "WebKit": {

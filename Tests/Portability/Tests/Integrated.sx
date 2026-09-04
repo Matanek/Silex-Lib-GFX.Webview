@@ -1,0 +1,47 @@
+use GFX.Audio as GFXAudio
+use GFX.Canvas
+use GFX.Font as VectorFont
+use GFX.Plugins
+use GFX.WebView
+use Image
+use Image.JPEG
+use Image.WebP
+use STD.Math
+
+func required_face(result:Result<VectorFont.Face, VectorFont.Error>) VectorFont.Face {
+    match result {
+        failure(error) => { panic(error.detail) }
+        success(face) => { return face }
+    }
+}
+
+test "compose the official native desktop packages through public APIs" {
+    let playback = GFXAudio.Playback(
+        volume:0.5,
+        repeat:GFXAudio.Repeat.times(2)
+    )
+    assert(playback.volume == 0.5)
+
+    var font = Canvas.Font(required_face(VectorFont.Face.default()))
+    var drawing = Canvas()
+    drawing.paint(func(painter:&Canvas.Painter) {
+        painter.text(
+            "Silex",
+            Math.Vec2(1.0),
+            Canvas.TextStyle(size:12.0, font:font)
+        )
+    })
+    let raster = drawing.rasterize(48, 20)
+    assert(raster.width() == 48)
+    assert(raster.height() == 20)
+
+    var bitmap = Image.canvas(2, 2, Image.Color(120, 80, 40))
+    let jpeg = Image.encode(bitmap, JPEG.Options(quality:90))
+    let webp = Image.encode(bitmap, WebP.Options(lossless:true))
+    assert(Image.decode(jpeg).width() == 2)
+    assert(Image.decode(webp).height() == 2)
+
+    let site = WebView.Site.html("<!doctype html><html></html>")
+    let plugin = Plugins.WebView(site)
+    assert(plugin.id() == "GFX.WebView.Plugin")
+}

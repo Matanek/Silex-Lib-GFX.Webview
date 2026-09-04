@@ -1,77 +1,284 @@
-name: Validate WebView portability
+name: Validate official desktop package portability
 
-run-name: Validate WebView portability (${{ inputs.target }})
+run-name: Validate official desktop packages (${{ inputs.target }})
 
 on:
   workflow_dispatch:
     inputs:
       target:
-        description: System WebView adapter to execute
+        description: Native desktop target to execute
         required: true
         type: choice
         default: all
         options:
           - all
+          - macos-arm64
+          - macos-x64
+          - linux-arm64
           - linux-x64
+          - windows-arm64
           - windows-x64
 
 permissions:
   contents: read
 
 concurrency:
-  group: webview-portability-${{ github.ref }}-${{ inputs.target }}
+  group: desktop-package-portability-${{ github.ref }}-${{ inputs.target }}
   cancel-in-progress: true
 
 env:
-  SILEX_CHECKPOINT: 49d3e3d5664098fce59b9bf5e6337c3c084f37b8
-  STD_CHECKPOINT: 5a018305fb470dfe00e94466150b3c04f207e252
-  GFX_CHECKPOINT: 727efa9356ab9488e884ab8207a97269b1aaf0ec
+  SILEX_CHECKPOINT: 10037a013bc5d5edaa05e1bfd8b61212ec3b6e37
+  STD_CHECKPOINT: 997ce443190e7b093e257f7c2df62fac33a0859f
+  JSON_CHECKPOINT: 046f6411f8146eeae1c51dac5f590918997b8541
+  GFX_CHECKPOINT: f0c9123df8f2cf2224eaa27f8619991e4acea900
+  ASSETS_CHECKPOINT: 50bc47c68b33a9a8fb7e17f110820e9cb3b73f37
+  AUDIO_CHECKPOINT: 7ac8650883fd1a8a911db76ab88c6909e64eddf6
+  FONT_CHECKPOINT: 85b5c9b933ffb70f1fbd23dd29315ac2911e9492
+  CANVAS_CHECKPOINT: a09608ec0267f5678bd7dab6a852f14623f34040
+  IMAGE_CHECKPOINT: 9f6efc570ffd7e0667e36adedd164c012ba0adb0
+  SDL_REVISION: 8e37db5e797b6167f3a00d697d816a684bd259c7
+  SDL_MIXER_REVISION: 72a81869b45e249e8e67102db4e98dd2441f05a1
 
 jobs:
-  linux-x64:
-    if: inputs.target == 'all' || inputs.target == 'linux-x64'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+  native:
+    if: inputs.target != 'windows-arm64'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-arm64
+            runner: macos-15
+            zig_archive: zig-aarch64-macos-0.16.0.tar.xz
+            zig_sha256: b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489
+            zig_directory: zig-aarch64-macos-0.16.0
+          - target: macos-x64
+            runner: macos-15-intel
+            zig_archive: zig-x86_64-macos-0.16.0.tar.xz
+            zig_sha256: 0387557ed1877bc6a2e1802c8391953baddba76081876301c522f52977b52ba7
+            zig_directory: zig-x86_64-macos-0.16.0
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            zig_archive: zig-aarch64-linux-0.16.0.tar.xz
+            zig_sha256: ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
+            zig_directory: zig-aarch64-linux-0.16.0
+          - target: linux-x64
+            runner: ubuntu-24.04
+            zig_archive: zig-x86_64-linux-0.16.0.tar.xz
+            zig_sha256: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
+            zig_directory: zig-x86_64-linux-0.16.0
+          - target: windows-x64
+            runner: windows-2025
+            zig_archive: zig-x86_64-windows-0.16.0.zip
+            zig_sha256: 68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e
+            zig_directory: zig-x86_64-windows-0.16.0
+
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
 
     steps:
       - name: Check out GFX.WebView
+        if: inputs.target == 'all' || inputs.target == matrix.target
         uses: actions/checkout@v6
         with:
           path: GFX.WebView
 
-      - name: Check out the Silex compiler
+      - name: Check out Silex
+        if: inputs.target == 'all' || inputs.target == matrix.target
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex
           ref: ${{ env.SILEX_CHECKPOINT }}
           path: _silex
 
-      - name: Check out the exact STD checkpoint
+      - name: Check out STD
+        if: inputs.target == 'all' || inputs.target == matrix.target
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-STD
           ref: ${{ env.STD_CHECKPOINT }}
           path: STD
 
-      - name: Check out the exact GFX checkpoint
+      - name: Check out JSON
+        if: inputs.target == 'all' || inputs.target == matrix.target
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-JSON
+          ref: ${{ env.JSON_CHECKPOINT }}
+          path: JSON
+
+      - name: Check out GFX
+        if: inputs.target == 'all' || inputs.target == matrix.target
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-GFX
           ref: ${{ env.GFX_CHECKPOINT }}
           path: GFX
 
-      - name: Install WebKitGTK and Zig
+      - name: Check out GFX.Assets
+        if: inputs.target == 'all' || inputs.target == matrix.target
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX.Assets
+          ref: ${{ env.ASSETS_CHECKPOINT }}
+          path: GFX.Assets
+
+      - name: Check out GFX.Audio
+        if: inputs.target == 'all' || inputs.target == matrix.target
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX.Audio
+          ref: ${{ env.AUDIO_CHECKPOINT }}
+          path: GFX.Audio
+
+      - name: Check out GFX.Font
+        if: inputs.target == 'all' || inputs.target == matrix.target
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX.Font
+          ref: ${{ env.FONT_CHECKPOINT }}
+          path: GFX.Font
+
+      - name: Check out GFX.Canvas
+        if: inputs.target == 'all' || inputs.target == matrix.target
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX.Canvas
+          ref: ${{ env.CANVAS_CHECKPOINT }}
+          path: GFX.Canvas
+
+      - name: Check out Image
+        if: inputs.target == 'all' || inputs.target == matrix.target
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-Image
+          ref: ${{ env.IMAGE_CHECKPOINT }}
+          path: Image
+
+      - name: Check out SDL 3.4.10
+        if: (inputs.target == 'all' || inputs.target == matrix.target) && (matrix.target == 'macos-x64' || matrix.target == 'linux-arm64')
+        uses: actions/checkout@v6
+        with:
+          repository: libsdl-org/SDL
+          ref: ${{ env.SDL_REVISION }}
+          path: _SDL
+
+      - name: Check out SDL_mixer 3.2.4
+        if: (inputs.target == 'all' || inputs.target == matrix.target) && (matrix.target == 'macos-x64' || matrix.target == 'linux-arm64')
+        uses: actions/checkout@v6
+        with:
+          repository: libsdl-org/SDL_mixer
+          ref: ${{ env.SDL_MIXER_REVISION }}
+          path: _SDL_mixer
+
+      - name: Install Zig 0.16.0 on Unix
+        if: (inputs.target == 'all' || inputs.target == matrix.target) && runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev xvfb
-          curl -fL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz -o "$RUNNER_TEMP/zig.tar.xz"
-          echo "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
-          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+          archive="$RUNNER_TEMP/${{ matrix.zig_archive }}"
+          curl -fL --retry 5 --retry-all-errors \
+            "https://ziglang.org/download/0.16.0/${{ matrix.zig_archive }}" \
+            -o "$archive"
+          if command -v sha256sum >/dev/null 2>&1; then
+            echo "${{ matrix.zig_sha256 }}  $archive" | sha256sum -c -
+          else
+            echo "${{ matrix.zig_sha256 }}  $archive" | shasum -a 256 -c -
+          fi
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/${{ matrix.zig_directory }}" >> "$GITHUB_PATH"
 
-      - name: Build Silex
+      - name: Install Zig 0.16.0 on Windows X64
+        if: (inputs.target == 'all' || inputs.target == matrix.target) && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $archive = Join-Path $env:RUNNER_TEMP "${{ matrix.zig_archive }}"
+          Invoke-WebRequest "https://ziglang.org/download/0.16.0/${{ matrix.zig_archive }}" -OutFile $archive
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne "${{ matrix.zig_sha256 }}") {
+            throw "Zig archive checksum mismatch"
+          }
+          Expand-Archive $archive -DestinationPath $env:RUNNER_TEMP
+          Add-Content $env:GITHUB_PATH (Join-Path $env:RUNNER_TEMP "${{ matrix.zig_directory }}")
+
+      - name: Select the recorded Xcode toolchain
+        if: (inputs.target == 'all' || inputs.target == matrix.target) && matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install Linux native requirements
+        if: (inputs.target == 'all' || inputs.target == matrix.target) && runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev xauth xvfb \
+            libasound2-dev libdbus-1-dev libdecor-0-dev libdrm-dev \
+            libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev \
+            libgles2-mesa-dev libibus-1.0-dev libjack-dev libpipewire-0.3-dev \
+            libpulse-dev libsndio-dev libthai-dev libudev-dev liburing-dev \
+            libusb-1.0-0-dev libwayland-dev libx11-dev libxext-dev \
+            libxcursor-dev libxfixes-dev libxi-dev libxkbcommon-dev \
+            libxrandr-dev libxss-dev libxtst-dev wayland-protocols
+
+      - name: Prepare macOS X64 native candidates
+        if: (inputs.target == 'all' || inputs.target == matrix.target) && matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          GFX/Tools/build-sdl3.sh "$GITHUB_WORKSPACE/_SDL" macos-x64 "$RUNNER_TEMP/sdl3"
+          mkdir -p GFX/Boundary/macos-x64
+          cp "$RUNNER_TEMP/sdl3/SDL3-3.4.10-macos-x64.a" GFX/Boundary/macos-x64/libSDL3.a
+          GFX.Audio/Native/build-sdl3-mixer.sh \
+            "$GITHUB_WORKSPACE/_SDL" "$GITHUB_WORKSPACE/_SDL_mixer" \
+            macos-x64 "$RUNNER_TEMP/audio"
+          mkdir -p GFX.Audio/Boundary/macos-x64
+          cp "$RUNNER_TEMP/audio/SDL3_mixer-3.2.4-macos-x64.a" \
+            GFX.Audio/Boundary/macos-x64/libSDL3_mixer.a
+
+      - name: Prepare Linux ARM64 native candidates
+        if: (inputs.target == 'all' || inputs.target == matrix.target) && matrix.target == 'linux-arm64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/arm64 \
+            -e RUNNER_TEMP=/runner-temp \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -v "$RUNNER_TEMP:/runner-temp" \
+            ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc bash -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -y
+              apt-get install -y \
+                build-essential cmake file git make ninja-build patch pkg-config \
+                libasound2-dev libaudio-dev libdbus-1-dev libdecor-0-dev \
+                libdrm-dev libegl1-mesa-dev libfribidi-dev libgbm-dev \
+                libgl1-mesa-dev libgles2-mesa-dev libibus-1.0-dev \
+                libjack-dev libpipewire-0.3-dev libpulse-dev libsndio-dev \
+                libthai-dev libudev-dev liburing-dev libusb-1.0-0-dev \
+                libwayland-dev libx11-dev libxext-dev libxcursor-dev \
+                libxfixes-dev libxi-dev libxkbcommon-dev libxrandr-dev \
+                libxss-dev libxtst-dev wayland-protocols
+              git config --global --add safe.directory /workspace/_SDL
+              /workspace/GFX/Tools/build-sdl3.sh \
+                /workspace/_SDL linux-arm64 /runner-temp/sdl3
+              /workspace/GFX.Audio/Native/build-sdl3-mixer.sh \
+                /workspace/_SDL /workspace/_SDL_mixer \
+                linux-arm64 /runner-temp/audio
+            '
+          mkdir -p GFX/Boundary/linux-arm64 GFX.Audio/Boundary/linux-arm64
+          cp "$RUNNER_TEMP/sdl3/SDL3-3.4.10-linux-arm64.a" \
+            GFX/Boundary/linux-arm64/libSDL3.a
+          cp "$RUNNER_TEMP/audio/SDL3_mixer-3.2.4-linux-arm64.a" \
+            GFX.Audio/Boundary/linux-arm64/libSDL3_mixer.a
+
+      - name: Build the native Silex compiler
+        if: inputs.target == 'all' || inputs.target == matrix.target
         shell: bash
         run: |
           set -euo pipefail
@@ -79,29 +286,69 @@ jobs:
             --prefix "$RUNNER_TEMP/silex-prefix" \
             --build-file _silex/Toolchain/build.zig
 
-      - name: Run the Linux WebKitGTK adapter
+      - name: Exercise all official native desktop packages
+        if: inputs.target == 'all' || inputs.target == matrix.target
         shell: bash
         run: |
           set -euo pipefail
-          export HOME="$RUNNER_TEMP/home"
-          mkdir -p "$HOME"
           silex="$RUNNER_TEMP/silex-prefix/bin/silex"
-          "$silex" setup
-          "$silex" link "$GITHUB_WORKSPACE/STD"
-          "$silex" install JSON
-          "$silex" link "$GITHUB_WORKSPACE/GFX"
-          "$silex" link "$GITHUB_WORKSPACE/GFX.WebView"
-          webview_output=$(xvfb-run -a env GDK_BACKEND=x11 SDL_VIDEO_DRIVER=x11 \
-            NO_AT_BRIDGE=1 LIBGL_ALWAYS_SOFTWARE=1 \
-            WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 \
-            "$silex" test "$GITHUB_WORKSPACE/GFX.WebView/Tests")
-          printf '%s\n' "$webview_output"
-          grep -Fxq '5 passed; 0 failed in 4 files' <<< "$webview_output"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            silex="$silex.exe"
+          fi
+          GFX.WebView/Tools/run-desktop-package-smoke.sh \
+            "$silex" "${{ matrix.target }}" \
+            "$GITHUB_WORKSPACE/STD" "$GITHUB_WORKSPACE/JSON" \
+            "$GITHUB_WORKSPACE/GFX" "$GITHUB_WORKSPACE/GFX.Assets" \
+            "$GITHUB_WORKSPACE/GFX.Audio" "$GITHUB_WORKSPACE/GFX.Font" \
+            "$GITHUB_WORKSPACE/GFX.Canvas" "$GITHUB_WORKSPACE/Image" \
+            "$GITHUB_WORKSPACE/GFX.WebView" "$RUNNER_TEMP/package-smoke"
 
-  windows-x64:
-    if: inputs.target == 'all' || inputs.target == 'windows-x64'
-    runs-on: windows-2025
-    timeout-minutes: 20
+  windows-arm64-build:
+    if: inputs.target == 'all' || inputs.target == 'windows-arm64'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out Silex
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex
+          ref: ${{ env.SILEX_CHECKPOINT }}
+          path: _silex
+
+      - name: Install Zig 0.16.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/zig.tar.xz"
+          curl -fL --retry 5 --retry-all-errors \
+            https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz \
+            -o "$archive"
+          echo "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  $archive" | sha256sum -c -
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+
+      - name: Cross-build the Windows ARM64 compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          zig build -Dtarget=aarch64-windows -Doptimize=ReleaseFast -Dcpu=baseline \
+            --prefix "$RUNNER_TEMP/silex-prefix" \
+            --build-file _silex/Toolchain/build.zig
+
+      - name: Transfer the Windows ARM64 compiler
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-packages-windows-arm64-silex
+          path: ${{ runner.temp }}/silex-prefix
+          retention-days: 1
+          if-no-files-found: error
+
+  windows-arm64:
+    if: inputs.target == 'all' || inputs.target == 'windows-arm64'
+    needs: windows-arm64-build
+    runs-on: windows-11-arm
+    timeout-minutes: 120
 
     steps:
       - name: Check out GFX.WebView
@@ -109,83 +356,92 @@ jobs:
         with:
           path: GFX.WebView
 
-      - name: Check out the Silex compiler
-        uses: actions/checkout@v6
-        with:
-          repository: Matanek/Silex
-          ref: ${{ env.SILEX_CHECKPOINT }}
-          path: _silex
-
-      - name: Check out the exact STD checkpoint
+      - name: Check out STD
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-STD
           ref: ${{ env.STD_CHECKPOINT }}
           path: STD
 
-      - name: Check out the exact GFX checkpoint
+      - name: Check out JSON
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-JSON
+          ref: ${{ env.JSON_CHECKPOINT }}
+          path: JSON
+
+      - name: Check out GFX
         uses: actions/checkout@v6
         with:
           repository: Matanek/Silex-Lib-GFX
           ref: ${{ env.GFX_CHECKPOINT }}
           path: GFX
 
-      - name: Install Zig
+      - name: Check out GFX.Assets
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX.Assets
+          ref: ${{ env.ASSETS_CHECKPOINT }}
+          path: GFX.Assets
+
+      - name: Check out GFX.Audio
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX.Audio
+          ref: ${{ env.AUDIO_CHECKPOINT }}
+          path: GFX.Audio
+
+      - name: Check out GFX.Font
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX.Font
+          ref: ${{ env.FONT_CHECKPOINT }}
+          path: GFX.Font
+
+      - name: Check out GFX.Canvas
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-GFX.Canvas
+          ref: ${{ env.CANVAS_CHECKPOINT }}
+          path: GFX.Canvas
+
+      - name: Check out Image
+        uses: actions/checkout@v6
+        with:
+          repository: Matanek/Silex-Lib-Image
+          ref: ${{ env.IMAGE_CHECKPOINT }}
+          path: Image
+
+      - name: Download the Windows ARM64 compiler
+        uses: actions/download-artifact@v5
+        with:
+          name: desktop-packages-windows-arm64-silex
+          path: ${{ runner.temp }}/silex-prefix
+
+      - name: Verify the native Windows ARM64 compiler
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $archive = Join-Path $env:RUNNER_TEMP "zig.zip"
-          Invoke-WebRequest https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip -OutFile $archive
-          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne "68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e") {
-            throw "Zig archive checksum mismatch"
+          $architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+          if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64" -or $architecture -ne "Arm64") {
+            throw "expected a native Windows ARM64 runner"
           }
-          Expand-Archive $archive -DestinationPath $env:RUNNER_TEMP
-          Add-Content $env:GITHUB_PATH (Join-Path $env:RUNNER_TEMP "zig-x86_64-windows-0.16.0")
-
-      - name: Build Silex
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          zig build -Doptimize=ReleaseFast -Dcpu=baseline `
-            --prefix "$env:RUNNER_TEMP/silex-prefix" `
-            --build-file _silex/Toolchain/build.zig
-
-      - name: Run the Windows WebView2 adapter
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $true
-          $env:USERPROFILE = Join-Path $env:RUNNER_TEMP "home"
-          $env:HOME = $env:USERPROFILE
-          New-Item -ItemType Directory -Force $env:USERPROFILE | Out-Null
           $silex = Join-Path $env:RUNNER_TEMP "silex-prefix/bin/silex.exe"
-          & $silex setup
-          & $silex link (Join-Path $env:GITHUB_WORKSPACE "STD")
-          & $silex install JSON
-          & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX")
-          & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView")
-          $webViewOutput = @(& $silex test (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests"))
-          $testExitCode = $LASTEXITCODE
-          $webViewOutput | ForEach-Object { Write-Output $_ }
-          if ($testExitCode -ne 0 -or -not ($webViewOutput -contains "5 passed; 0 failed in 4 files")) {
-            throw "expected all four WebView test files to pass, native exit code: $testExitCode"
+          $bytes = [System.IO.File]::ReadAllBytes($silex)
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          if ($machine -ne 0xaa64) {
+            throw "expected an ARM64 Silex executable"
           }
 
-      - name: Cross-compile the Windows ARM64 fragment
-        shell: pwsh
+      - name: Exercise all official native desktop packages
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $true
-          $env:USERPROFILE = Join-Path $env:RUNNER_TEMP "home-arm64"
-          $env:HOME = $env:USERPROFILE
-          New-Item -ItemType Directory -Force $env:USERPROFILE | Out-Null
-          $silex = Join-Path $env:RUNNER_TEMP "silex-prefix/bin/silex.exe"
-          & $silex setup
-          & $silex link (Join-Path $env:GITHUB_WORKSPACE "STD") --target windows-arm64
-          & $silex install JSON --target windows-arm64
-          & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX") --target windows-arm64
-          & $silex link (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView") --target windows-arm64
-          & $silex compile (Join-Path $env:GITHUB_WORKSPACE "GFX.WebView/Tests/Fixtures/WindowsArm64Compile.sx") `
-            --target windows-arm64 `
-            -o (Join-Path $env:RUNNER_TEMP "webview-arm64.exe")
+          set -euo pipefail
+          GFX.WebView/Tools/run-desktop-package-smoke.sh \
+            "$RUNNER_TEMP/silex-prefix/bin/silex.exe" windows-arm64 \
+            "$GITHUB_WORKSPACE/STD" "$GITHUB_WORKSPACE/JSON" \
+            "$GITHUB_WORKSPACE/GFX" "$GITHUB_WORKSPACE/GFX.Assets" \
+            "$GITHUB_WORKSPACE/GFX.Audio" "$GITHUB_WORKSPACE/GFX.Font" \
+            "$GITHUB_WORKSPACE/GFX.Canvas" "$GITHUB_WORKSPACE/Image" \
+            "$GITHUB_WORKSPACE/GFX.WebView" "$RUNNER_TEMP/package-smoke"
