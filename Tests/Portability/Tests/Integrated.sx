@@ -47,12 +47,30 @@ test "compose GFX.Audio through its public API" {
     assert(playback.volume == 0.5)
 }
 
-test "shape and rasterize GFX.Font through its public API" {
+test "load GFX.Font through its public API" {
+    var face = required_face(VectorFont.Face.default())
+    assert(face.units_per_em() > 0)
+}
+
+test "create a GFX.Font instance through its public API" {
+    var face = required_face(VectorFont.Face.default())
+    var instance = required_instance(VectorFont.Instance.create(face, size:12.0))
+    assert(instance.size() == 12.0)
+}
+
+test "shape GFX.Font through its public API" {
     var face = required_face(VectorFont.Face.default())
     var instance = required_instance(VectorFont.Instance.create(face, size:12.0))
     var run = required_run(instance.shape("Silex"))
     let glyphs = run.glyphs()
     assert(glyphs.count() > 0)
+}
+
+test "rasterize GFX.Font through its public API" {
+    var face = required_face(VectorFont.Face.default())
+    var instance = required_instance(VectorFont.Instance.create(face, size:12.0))
+    var run = required_run(instance.shape("Silex"))
+    let glyphs = run.glyphs()
     let raster = required_glyph(instance.rasterize_glyph(glyphs[0].id))
     assert(!raster.is_empty())
 }
