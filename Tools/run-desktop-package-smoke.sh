@@ -36,14 +36,17 @@ link_into() {
 }
 
 run_consumer() {
-    local consumer="$1"
+    local label="$1"
+    local consumer="$2"
+    local output_file="$temporary_dir/$target-$label.log"
     local output
     local status
+    echo "BEGIN $target $label consumer"
     set +e
-    output="$(SDL_AUDIODRIVER=dummy "$silex" test "$consumer/Tests" --nocache 2>&1)"
-    status=$?
+    SDL_AUDIODRIVER=dummy "$silex" test "$consumer/Tests" --nocache 2>&1 | tee "$output_file"
+    status=${PIPESTATUS[0]}
     set -e
-    printf '%s\n' "$output"
+    output="$(< "$output_file")"
     if [[ $status -ne 0 ]]; then
         if [[ "$target" == macos-x64 ]]; then
             local executable
@@ -57,6 +60,7 @@ run_consumer() {
         return "$status"
     fi
     grep -Eq '[1-9][0-9]* passed; 0 failed in [1-9][0-9]* files' <<< "$output"
+    echo "PASS $target $label consumer"
 }
 
 if [[ "$target" == windows-arm64 ]]; then
@@ -77,12 +81,12 @@ link_into "$image_dir/Tests/Consumer" "$std_dir" "$gfx_dir" "$image_dir"
 link_into "$webview_dir/Tests/Consumer" \
     "$std_dir" "$json_dir" "$gfx_dir" "$webview_dir"
 
-run_consumer "$integrated_consumer"
-run_consumer "$audio_dir/Tests/Consumer"
-run_consumer "$font_dir/Tests/Consumer"
-run_consumer "$canvas_dir/Tests/Consumer"
-run_consumer "$image_dir/Tests/Consumer"
-run_consumer "$webview_dir/Tests/Consumer"
+run_consumer integrated "$integrated_consumer"
+run_consumer audio "$audio_dir/Tests/Consumer"
+run_consumer font "$font_dir/Tests/Consumer"
+run_consumer canvas "$canvas_dir/Tests/Consumer"
+run_consumer image "$image_dir/Tests/Consumer"
+run_consumer webview "$webview_dir/Tests/Consumer"
 
 link_into "$webview_dir" "$std_dir" "$json_dir" "$gfx_dir"
 if [[ "$target" == linux-* ]]; then
