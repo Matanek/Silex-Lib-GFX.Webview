@@ -82,11 +82,18 @@ link_into "$webview_dir/Tests/Consumer" \
     "$std_dir" "$json_dir" "$gfx_dir" "$webview_dir"
 
 run_consumer integrated "$integrated_consumer"
-run_consumer audio "$audio_dir/Tests/Consumer"
-run_consumer font "$font_dir/Tests/Consumer"
-run_consumer canvas "$canvas_dir/Tests/Consumer"
-run_consumer image "$image_dir/Tests/Consumer"
-run_consumer webview "$webview_dir/Tests/Consumer"
+
+# The integrated consumer crosses every portable package's public Boundary on
+# every native target. Run the larger reference consumers once on macOS, as
+# required by the portability contract, instead of recompiling multi-megabyte
+# embedded fixtures six times.
+if [[ "$target" == macos-arm64 ]]; then
+    run_consumer audio "$audio_dir/Tests/Consumer"
+    run_consumer font "$font_dir/Tests/Consumer"
+    run_consumer canvas "$canvas_dir/Tests/Consumer"
+    run_consumer image "$image_dir/Tests/Consumer"
+    run_consumer webview "$webview_dir/Tests/Consumer"
+fi
 
 link_into "$webview_dir" "$std_dir" "$json_dir" "$gfx_dir"
 if [[ "$target" == linux-* ]]; then
