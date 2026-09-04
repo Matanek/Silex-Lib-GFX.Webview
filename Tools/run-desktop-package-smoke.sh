@@ -53,7 +53,7 @@ link_into "$integrated_consumer" \
 link_into "$audio_dir/Tests/Consumer" "$std_dir" "$gfx_dir" "$audio_dir"
 link_into "$font_dir/Tests/Consumer" "$std_dir" "$gfx_dir" "$font_dir"
 link_into "$canvas_dir/Tests/Consumer" \
-    "$std_dir" "$gfx_dir" "$assets_dir" "$font_dir" "$canvas_dir"
+    "$std_dir" "$json_dir" "$gfx_dir" "$assets_dir" "$font_dir" "$canvas_dir"
 link_into "$image_dir/Tests/Consumer" "$std_dir" "$gfx_dir" "$image_dir"
 link_into "$webview_dir/Tests/Consumer" \
     "$std_dir" "$json_dir" "$gfx_dir" "$webview_dir"
@@ -80,7 +80,8 @@ grep -Fxq '5 passed; 0 failed in 4 files' <<< "$webview_output"
 if [[ "$target" == macos-arm64 ]]; then
     link_into "$audio_dir" "$std_dir" "$gfx_dir"
     link_into "$font_dir" "$std_dir" "$gfx_dir"
-    link_into "$canvas_dir" "$std_dir" "$gfx_dir" "$assets_dir" "$font_dir"
+    link_into "$canvas_dir" \
+        "$std_dir" "$json_dir" "$gfx_dir" "$assets_dir" "$font_dir"
     link_into "$image_dir" "$std_dir" "$gfx_dir"
     for package_tests in \
         "$audio_dir/Tests" \
