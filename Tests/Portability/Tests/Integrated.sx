@@ -15,12 +15,46 @@ func required_face(result:Result<VectorFont.Face, VectorFont.Error>) VectorFont.
     }
 }
 
+func required_instance(result:Result<VectorFont.Instance, VectorFont.Error>) VectorFont.Instance {
+    match result {
+        failure(error) => { panic(error.detail) }
+        success(instance) => { return instance }
+    }
+}
+
+func required_run(result:Result<VectorFont.GlyphRun, VectorFont.Error>) VectorFont.GlyphRun {
+    match result {
+        failure(error) => { panic(error.detail) }
+        success(run) => { return run }
+    }
+}
+
+func required_glyph(result:Result<VectorFont.GlyphCoverage?, VectorFont.Error>) VectorFont.GlyphCoverage {
+    match result {
+        failure(error) => { panic(error.detail) }
+        success(coverage) => {
+            if value = coverage { return value }
+            panic("expected glyph coverage")
+        }
+    }
+}
+
 test "compose GFX.Audio through its public API" {
     let playback = GFXAudio.Playback(
         volume:0.5,
         repeat:GFXAudio.Repeat.times(2)
     )
     assert(playback.volume == 0.5)
+}
+
+test "shape and rasterize GFX.Font through its public API" {
+    var face = required_face(VectorFont.Face.default())
+    var instance = required_instance(VectorFont.Instance.create(face, size:12.0))
+    var run = required_run(instance.shape("Silex"))
+    let glyphs = run.glyphs()
+    assert(glyphs.count() > 0)
+    let raster = required_glyph(instance.rasterize_glyph(glyphs[0].id))
+    assert(!raster.is_empty())
 }
 
 test "compose GFX.Canvas and GFX.Font through their public APIs" {
