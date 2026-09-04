@@ -38,8 +38,24 @@ link_into() {
 run_consumer() {
     local consumer="$1"
     local output
-    output="$(SDL_AUDIODRIVER=dummy "$silex" test "$consumer/Tests" --nocache)"
+    local status
+    set +e
+    output="$(SDL_AUDIODRIVER=dummy "$silex" test "$consumer/Tests" --nocache 2>&1)"
+    status=$?
+    set -e
     printf '%s\n' "$output"
+    if [[ $status -ne 0 ]]; then
+        if [[ "$target" == macos-x64 ]]; then
+            local executable
+            executable="$(sed -n 's/^silex: retained executable: //p' <<< "$output" | head -n 1)"
+            if [[ -n "$executable" && -x "$executable" ]]; then
+                echo "LLDB backtrace for $executable"
+                SDL_AUDIODRIVER=dummy lldb --batch \
+                    -o run -o "thread backtrace all" -- "$executable" || true
+            fi
+        fi
+        return "$status"
+    fi
     grep -Eq '[1-9][0-9]* passed; 0 failed in [1-9][0-9]* files' <<< "$output"
 }
 
