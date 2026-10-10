@@ -48,35 +48,35 @@ test "compose GFX.Audio through its public API" {
 }
 
 test "load GFX.Font through its public API" {
-    var face = required_face(VectorFont.Face.default())
+    var face = required_face((try VectorFont.Face.default()))
     assert(face.units_per_em() > 0)
 }
 
 test "create a GFX.Font instance through its public API" {
-    var face = required_face(VectorFont.Face.default())
-    var instance = required_instance(VectorFont.Instance.create(face, size:12.0))
+    var face = required_face((try VectorFont.Face.default()))
+    var instance = required_instance((try VectorFont.Instance.create(face, size:12.0)))
     assert(instance.size() == 12.0)
 }
 
 test "shape GFX.Font through its public API" {
-    var face = required_face(VectorFont.Face.default())
-    var instance = required_instance(VectorFont.Instance.create(face, size:12.0))
-    var run = required_run(instance.shape("Silex"))
+    var face = required_face((try VectorFont.Face.default()))
+    var instance = required_instance((try VectorFont.Instance.create(face, size:12.0)))
+    var run = required_run((try instance.shape("Silex")))
     let glyphs = run.glyphs()
     assert(glyphs.count() > 0)
 }
 
 test "rasterize GFX.Font through its public API" {
-    var face = required_face(VectorFont.Face.default())
-    var instance = required_instance(VectorFont.Instance.create(face, size:12.0))
-    var run = required_run(instance.shape("Silex"))
+    var face = required_face((try VectorFont.Face.default()))
+    var instance = required_instance((try VectorFont.Instance.create(face, size:12.0)))
+    var run = required_run((try instance.shape("Silex")))
     let glyphs = run.glyphs()
-    let raster = required_glyph(instance.rasterize_glyph(glyphs[0].id))
+    let raster = required_glyph((try instance.rasterize_glyph(glyphs[0].id)))
     assert(!raster.is_empty())
 }
 
 test "compose GFX.Canvas and GFX.Font through their public APIs" {
-    var font = Canvas.Font(required_face(VectorFont.Face.default()))
+    var font = Canvas.Font(required_face((try VectorFont.Face.default())))
     var drawing = Canvas()
     drawing.paint(func(painter:&Canvas.Painter) {
         painter.text(

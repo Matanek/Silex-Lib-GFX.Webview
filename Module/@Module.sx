@@ -221,7 +221,7 @@ class Bridge {
     }
 
     func record(encoded_batch:str) {
-        match JSON.try_parse(encoded_batch) {
+        match (try JSON.parse(encoded_batch)) {
             failure(error) => {}
             success(var batch) => {
                 if var entries = batch.as_array() {
