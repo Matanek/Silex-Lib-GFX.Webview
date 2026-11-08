@@ -1,7 +1,7 @@
 {
   "sources": "Tests",
   "dependencies": {
-    "GFX": "^0.37.0",
-    "GFX.WebView": "^0.2.0"
+    "GFX": "^0.41.0",
+    "GFX.WebView": "^0.6.0"
   }
 }

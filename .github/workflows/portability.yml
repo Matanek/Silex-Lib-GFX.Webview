@@ -27,17 +27,16 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SILEX_CHECKPOINT: 6425cdd00747e7c113708dd32b9545331de0fd77
-  STD_CHECKPOINT: f4d86589534c7c183a3f17aacc50f1cdc6ac0415
-  JSON_CHECKPOINT: e5eae6c2ca9a7244df3c09e531ca1c818010e32a
-  GFX_CHECKPOINT: 1b5084f7d8605a678df2a0ff7da46af3d692a20c
-  ASSETS_CHECKPOINT: 907960397db0f0d300e6fc895fa8d5635a0aad01
-  AUDIO_CHECKPOINT: 8096161adc4c627092fe69a48f3e454544d949d9
-  FONT_CHECKPOINT: e520dd899ac5a2598bdb646ee270baa49c1f301c
-  CANVAS_CHECKPOINT: c64f73da05b82bcdaf9bb493fa7fd984213bd741
-  IMAGE_CHECKPOINT: 753f9f6c584481626905fe2ea3ba8da957ae4ae5
+  SILEX_CHECKPOINT: 400fa63c3fd003ea80b25c88149ba1351f4c787b
+  STD_CHECKPOINT: e1525ef354a2e1c9018aa147635293842692459d
+  JSON_CHECKPOINT: 5b8d464d121b6933b2680938b0a862f519ef23cb
+  GFX_CHECKPOINT: bf4899475047e19736fe0bb6e260db55ed209270
+  ASSETS_CHECKPOINT: c29f18645b35cb25c214de1d1964954e36cb34e7
+  AUDIO_CHECKPOINT: 2a10f38678abc33298e976fc1897a8550455a1fb
+  FONT_CHECKPOINT: 23962273338304bba37026274c9e189130e1b38b
+  CANVAS_CHECKPOINT: 8237b1d8fb356fed9e19a04a1aaca9a423e8c685
+  IMAGE_CHECKPOINT: d7bc78c22c2fceba54df4034c146392149080df4
   SDL_REVISION: 8e37db5e797b6167f3a00d697d816a684bd259c7
-  SDL_MIXER_REVISION: 72a81869b45e249e8e67102db4e98dd2441f05a1
 
 jobs:
   native:
@@ -163,14 +162,6 @@ jobs:
           ref: ${{ env.SDL_REVISION }}
           path: _SDL
 
-      - name: Check out SDL_mixer 3.2.4
-        if: (inputs.target == 'all' || inputs.target == matrix.target) && (matrix.target == 'macos-x64' || matrix.target == 'linux-arm64')
-        uses: actions/checkout@v6
-        with:
-          repository: libsdl-org/SDL_mixer
-          ref: ${{ env.SDL_MIXER_REVISION }}
-          path: _SDL_mixer
-
       - name: Install Zig 0.16.0 on Unix
         if: (inputs.target == 'all' || inputs.target == matrix.target) && runner.os != 'Windows'
         shell: bash
@@ -226,7 +217,7 @@ jobs:
             libxcursor-dev libxfixes-dev libxi-dev libxkbcommon-dev \
             libxrandr-dev libxss-dev libxtst-dev wayland-protocols
 
-      - name: Prepare macOS X64 native candidates
+      - name: Prepare the macOS X64 SDL candidate
         if: (inputs.target == 'all' || inputs.target == matrix.target) && matrix.target == 'macos-x64'
         shell: bash
         run: |
@@ -234,14 +225,8 @@ jobs:
           GFX/Tools/build-sdl3.sh "$GITHUB_WORKSPACE/_SDL" macos-x64 "$RUNNER_TEMP/sdl3"
           mkdir -p GFX/Boundary/macos-x64
           cp "$RUNNER_TEMP/sdl3/SDL3-3.4.10-macos-x64.a" GFX/Boundary/macos-x64/libSDL3.a
-          GFX.Audio/Native/build-sdl3-mixer.sh \
-            "$GITHUB_WORKSPACE/_SDL" "$GITHUB_WORKSPACE/_SDL_mixer" \
-            macos-x64 "$RUNNER_TEMP/audio"
-          mkdir -p GFX.Audio/Boundary/macos-x64
-          cp "$RUNNER_TEMP/audio/SDL3_mixer-3.2.4-macos-x64.a" \
-            GFX.Audio/Boundary/macos-x64/libSDL3_mixer.a
 
-      - name: Prepare Linux ARM64 native candidates
+      - name: Prepare the Linux ARM64 SDL candidate
         if: (inputs.target == 'all' || inputs.target == matrix.target) && matrix.target == 'linux-arm64'
         shell: bash
         run: |
@@ -267,15 +252,10 @@ jobs:
               git config --global --add safe.directory /workspace/_SDL
               /workspace/GFX/Tools/build-sdl3.sh \
                 /workspace/_SDL linux-arm64 /runner-temp/sdl3
-              /workspace/GFX.Audio/Native/build-sdl3-mixer.sh \
-                /workspace/_SDL /workspace/_SDL_mixer \
-                linux-arm64 /runner-temp/audio
             '
-          mkdir -p GFX/Boundary/linux-arm64 GFX.Audio/Boundary/linux-arm64
+          mkdir -p GFX/Boundary/linux-arm64
           cp "$RUNNER_TEMP/sdl3/SDL3-3.4.10-linux-arm64.a" \
             GFX/Boundary/linux-arm64/libSDL3.a
-          cp "$RUNNER_TEMP/audio/SDL3_mixer-3.2.4-linux-arm64.a" \
-            GFX.Audio/Boundary/linux-arm64/libSDL3_mixer.a
 
       - name: Build the native Silex compiler
         if: inputs.target == 'all' || inputs.target == matrix.target

@@ -87,6 +87,8 @@ run_consumer integrated "$integrated_consumer"
 # every native target. Run the larger reference consumers once on macOS, as
 # required by the portability contract, instead of recompiling multi-megabyte
 # embedded fixtures six times.
+"$silex" test "$audio_dir/Tests/Consumer/Tests/EngineDefaults.sx" --nocache
+
 if [[ "$target" == macos-arm64 ]]; then
     run_consumer audio "$audio_dir/Tests/Consumer"
     run_consumer font "$font_dir/Tests/Consumer"
