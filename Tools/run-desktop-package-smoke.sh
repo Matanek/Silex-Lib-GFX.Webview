@@ -88,6 +88,11 @@ link_into "$webview_dir/Tests/Consumer" \
 
 run_consumer integrated "$integrated_consumer"
 
+if [[ "$target" == macos-arm64 ]]; then
+    python3 "$audio_dir/Native/EngineSimulator/DefaultParity.py" \
+        --output "$temporary_dir/native-engine-parity"
+fi
+
 # The integrated consumer crosses every portable package's public Boundary on
 # every native target. Run the larger reference consumers once on macOS, as
 # required by the portability contract, instead of recompiling multi-megabyte
@@ -125,8 +130,12 @@ if [[ "$target" == macos-arm64 ]]; then
         "$font_dir/Tests" \
         "$canvas_dir/Tests" \
         "$image_dir/Tests"; do
-        output="$(SDL_AUDIODRIVER=dummy "$silex" test "$package_tests" --nocache)"
+        status=0
+        output="$(SDL_AUDIODRIVER=dummy "$silex" test "$package_tests" --nocache)" || status=$?
         printf '%s\n' "$output"
+        if [[ $status -ne 0 ]]; then
+            exit "$status"
+        fi
         grep -Eq '[1-9][0-9]* passed; 0 failed in [1-9][0-9]* files' <<< "$output"
     done
 fi
