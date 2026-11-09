@@ -25,6 +25,11 @@ mkdir -p "$temporary_dir"
 # GFX.Font's public consumer intentionally verifies a relative workspace path.
 # Recreate only its scratch parent when the CI checkouts are laid out flat.
 mkdir -p "$(pwd)/Packages/GFX.Font/Tests/Consumer/Tests"
+# Audio file-I/O consumers use this workspace-relative public fixture path.
+if [[ "$audio_dir" != "$(pwd)/Packages/GFX.Audio" ]]; then
+    mkdir -p "$(pwd)/Packages/GFX.Audio/Tests/Fixtures"
+    cp -R "$audio_dir/Tests/Fixtures/MIDI" "$(pwd)/Packages/GFX.Audio/Tests/Fixtures/"
+fi
 
 link_into() {
     local workspace="$1"
