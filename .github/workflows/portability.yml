@@ -32,7 +32,7 @@ env:
   JSON_CHECKPOINT: f854f26bb43ec335e7b2a847bd9bbd609c8088c9
   GFX_CHECKPOINT: c3cef0bf2a105c72b8e4c4ade676247e06fe3c69
   ASSETS_CHECKPOINT: b0f34a8d56f6f4db7b907f08a7fa3c81ac8a4d43
-  AUDIO_CHECKPOINT: aeffa0c7c6dd46010c2977cb2552634fa3cb5678
+  AUDIO_CHECKPOINT: 1efd5033b14442adc2991a9a828477116fe5f212
   FONT_CHECKPOINT: a2c2045a2a3972529346bae1eb86f874f7798565
   CANVAS_CHECKPOINT: b3a94accf6b19bad6b36d637c3b1252f04cb0f41
   IMAGE_CHECKPOINT: 4146c1ac8f274d18b1ed18a7c4fa95a8fde11ad1
@@ -282,6 +282,19 @@ jobs:
             "$GITHUB_WORKSPACE/GFX.Audio" "$GITHUB_WORKSPACE/GFX.Font" \
             "$GITHUB_WORKSPACE/GFX.Canvas" "$GITHUB_WORKSPACE/Image" \
             "$GITHUB_WORKSPACE/GFX.WebView" "$RUNNER_TEMP/package-smoke"
+
+      - name: Preserve failed engine test executables
+        if: failure() && matrix.target == 'macos-arm64'
+        uses: actions/upload-artifact@v7
+        with:
+          name: engine-pcm-failed-executables-${{ github.run_attempt }}
+          path: |
+            ${{ github.workspace }}/.silex/test/EngineDefaults-*
+            ${{ github.workspace }}/GFX.Audio/Tests/Consumer/Tests/EngineDefaults.sx
+            ${{ runner.temp }}/package-smoke/native-engine-parity/*.bin
+            ${{ runner.temp }}/package-smoke/native-engine-parity/report.json
+          if-no-files-found: warn
+          retention-days: 7
 
   windows-arm64-build:
     if: inputs.target == 'all' || inputs.target == 'windows-arm64'
